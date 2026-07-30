@@ -38,7 +38,21 @@ function limpiarHTML(html) {
     .replace(/<[^>]+>/g, "\n")
     .replace(/&nbsp;/g, " ")
     .replace(/&aacute;/g, "á").replace(/&eacute;/g, "é").replace(/&iacute;/g, "í")
-    .replace(/&oacute;/g, "ó").replace(/&uacute;/g, "ú").replace(/&ntilde;/g, "ñ");
+    .replace(/&oacute;/g, "ó").replace(/&uacute;/g, "ú").replace(/&ntilde;/g, "ñ")
+    // Boilerplate que se repite en todas las páginas del sitio, no aporta nada
+    .replace(/Al hacer clic en este enlace[^.]*\./gi, " ")
+    .replace(/usted (está siendo dirigido|acepta ser dirigido)[^.]*\./gi, " ")
+    .replace(/BORA - Boletín Oficial de la República Argentina/gi, " ");
+}
+
+// De un texto largo, devuelve la oración (o par de oraciones) donde aparece la palabra clave,
+// en vez de mostrar siempre desde el principio del documento.
+function extraerContexto(textoPlano, keyword) {
+  const oraciones = textoPlano.split(/(?<=[.;])\s+/).map((o) => o.trim()).filter((o) => o.length > 10);
+  const idx = oraciones.findIndex((o) => o.toLowerCase().includes(keyword));
+  if (idx === -1) return textoPlano.slice(0, 280);
+  const desde = Math.max(0, idx);
+  return oraciones.slice(desde, desde + 2).join(" ").slice(0, 320);
 }
 
 async function fetchConTimeout(url, ms) {
@@ -91,12 +105,14 @@ exports.handler = async function () {
         const r = await fetchConTimeout(c.href, 5000);
         if (!r.ok) return;
         const detalleHtml = await r.text();
-        const textoDetalle = limpiarHTML(detalleHtml).replace(/\n+/g, " ").trim();
+        const textoDetalle = limpiarHTML(detalleHtml).replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
         const lower = textoDetalle.toLowerCase();
         const kw = KEYWORDS.find((k) => lower.includes(k));
         if (kw) {
+          const contexto = extraerContexto(textoDetalle, kw);
           resultados.push({
-            texto: (c.titulo + " — " + textoDetalle).slice(0, 320),
+            titulo: c.titulo.slice(0, 140),
+            texto: contexto,
             palabraClave: kw,
             fuente: c.href,
           });
