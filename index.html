@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sistema de Información Económica y de Comercio Exterior — Diego Dumont</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAF7; --line: #E3E1D6; --ink: #1C2B3A; --ink-soft: #3F4C58;
+    --muted: #7C8891; --accent: #B8792E; --pos: #2F7D4F; --neg: #B23A3A;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; margin: 0; padding: 36px 20px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  .header { border-bottom: 3px double var(--ink); padding-bottom: 18px; margin-bottom: 28px; }
+  .eyebrow { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; }
+  .title { font-family: 'Source Serif 4', Georgia, serif; font-size: clamp(22px, 3.2vw, 34px); font-weight: 700; line-height: 1.15; }
+  .live-status { font-size: 11px; margin-top: 6px; font-family: 'Space Mono', monospace; }
+  .live-ok { color: var(--pos); } .live-err { color: var(--neg); }
+  .section { margin-bottom: 36px; }
+  .section-title { font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid var(--ink); padding-bottom: 8px; margin-bottom: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; position: relative; }
+  .label { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .valor { font-family: 'Space Mono', monospace; font-size: 26px; margin-top: 4px; }
+  .fecha-dato { font-size: 10px; color: var(--muted); margin-top: 3px; font-family: 'Space Mono', monospace; }
+  .variacion { display: inline-flex; align-items: center; gap: 4px; font-family: 'Space Mono', monospace; font-size: 13px; padding: 3px 7px; border-radius: 3px; position: absolute; top: 14px; right: 14px; }
+  .def { font-size: 13px; color: var(--ink-soft); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: none; }
+  .toggle { background: none; border: none; cursor: pointer; color: var(--accent); font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; padding: 0; margin-top: 8px; display: block; }
+  a.fuente { color: var(--accent); font-size: 12px; text-decoration: none; }
+  .footer-note { margin-top: 30px; font-size: 11px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="eyebrow" id="fecha-hoy"></div>
+    <div class="title">Sistema de Información Económica y de Comercio Exterior — Diego Dumont</div>
+    <div class="live-status" id="live-status">Consultando en vivo…</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tipos de cambio</div>
+    <div class="grid" id="tipos-cambio"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Riesgo país</div>
+    <div class="grid" id="riesgo-pais"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Noticias Argentina</div>
+    <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:10px;">
+      ● Carga manual — Tarifar bloquea el acceso automático, no se puede automatizar sin su permiso
+    </div>
+    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin-bottom:10px;">Normativa Comex del día</div>
+    <div class="grid" style="grid-template-columns: 1fr;">
+      <div class="card">
+        <div class="label">30/07/2026</div>
+        <ul style="margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink-soft);">
+          <li><b>Dumping — Res. ME Nº 1155/2026:</b> apertura de examen por expiración de plazo de medidas antidumping a bornes de conexión eléctrica de China y Alemania.</li>
+          <li><b>Dumping — Res. ME Nº 1156/2026:</b> cierre de examen de medidas antidumping a hornos eléctricos domésticos de China.</li>
+          <li><b>Envíos postales — Res. Gral. ARCA Nº 5884/2026:</b> nuevo procedimiento para recepción de envíos internacionales vía operador postal, incluido puerta a puerta.</li>
+          <li><b>RIGI — Res. SM Nº 60/2026:</b> sustitución del listado de mercaderías del proyecto minero "Rincón" (Rincón Mining).</li>
+          <li><b>RIGI — Res. ME Nº 1154/2026:</b> adhesión al régimen para proyecto de exportación estratégica de minería, presentado por Vicuña Argentina SA.</li>
+        </ul>
+        <a class="fuente" href="https://web.tarifar.com/" target="_blank" rel="noreferrer" style="display:block;margin-top:10px;">Ver Tarifar ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">Tipos de cambio y Riesgo país: en vivo · Normativa Comex: carga manual diaria (Tarifar) · resto de las secciones: próxima etapa</div>
+</div>
+
+<script>
+const DOLAR_CONFIG = [
+  { casa: "mayorista", nombre: "Dólar mayorista", def: "Tipo de cambio de referencia mayorista (segmento MULC), usado para operaciones de comercio exterior." },
+  { casa: "oficial", nombre: "Dólar oficial (minorista)", def: "Tipo de cambio oficial de referencia para el público." },
+  { casa: "tarjeta", nombre: "Dólar Tarjeta", def: "Dólar oficial + 30% de percepción a cuenta de Ganancias y Bienes Personales (RG 5617 AFIP/ARCA)." },
+  { casa: "bolsa", nombre: "Dólar MEP", def: "Dólar Bolsa: se obtiene comprando bonos en pesos y vendiéndolos en dólares." },
+  { casa: "contadoconliqui", nombre: "Dólar CCL", def: "Contado con Liquidación: similar al MEP pero permite sacar los dólares fuera del país." },
+];
+
+document.getElementById("fecha-hoy").textContent = "Actualizado — " + new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+function fmtFecha(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Argentina/Buenos_Aires" }) + " " +
+    d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }) + "hs (ART)";
+}
+
+function cardHTML(cfg, d, prevVenta) {
+  const venta = d.venta;
+  const variacion = prevVenta ? Math.round(((venta - prevVenta) / prevVenta) * 1000) / 10 : 0;
+  const flat = variacion === 0;
+  const positive = variacion > 0;
+  const color = flat ? "var(--muted)" : positive ? "var(--pos)" : "var(--neg)";
+  const bg = flat ? "transparent" : positive ? "rgba(47,125,79,0.1)" : "rgba(178,58,58,0.1)";
+  const arrow = flat ? "–" : positive ? "▲" : "▼";
+  return `
+    <div class="card">
+      <div class="variacion" style="color:${color};background:${bg}">${arrow} ${Math.abs(variacion)}%</div>
+      <div class="label">${cfg.nombre}</div>
+      <div class="valor">$ ${venta.toLocaleString("es-AR", { minimumFractionDigits: venta % 1 === 0 ? 0 : 1 })}</div>
+      <div class="fecha-dato">Dato: ${fmtFecha(d.fechaActualizacion)}</div>
+      <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">¿Qué es esto? ▾</button>
+      <div class="def">${cfg.def}<br/><a class="fuente" href="https://dolarapi.com/v1/dolares" target="_blank" rel="noreferrer">Ver fuente (DolarAPI) ↗</a></div>
+    </div>`;
+}
+
+async function cargarTiposCambio() {
+  const statusEl = document.getElementById("live-status");
+  const cont = document.getElementById("tipos-cambio");
+  try {
+    const res = await fetch("https://dolarapi.com/v1/dolares");
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    const prevRaw = localStorage.getItem("prevDolares");
+    const prev = prevRaw ? JSON.parse(prevRaw) : {};
+    let html = "";
+    const nuevoPrev = {};
+    DOLAR_CONFIG.forEach((cfg) => {
+      const d = data.find((x) => x.casa === cfg.casa);
+      if (!d) return;
+      html += cardHTML(cfg, d, prev[cfg.casa]);
+      nuevoPrev[cfg.casa] = d.venta;
+    });
+    cont.innerHTML = html;
+    localStorage.setItem("prevDolares", JSON.stringify(nuevoPrev));
+    const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    statusEl.textContent = "● Tipos de cambio verificados en vivo — " + ahora + "hs";
+    statusEl.className = "live-status live-ok";
+  } catch (e) {
+    statusEl.textContent = "● No se pudo consultar en vivo en este momento — reintentando la próxima vez que se cargue la página";
+    statusEl.className = "live-status live-err";
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>Sin datos disponibles ahora mismo.</div>";
+  }
+}
+
+cargarTiposCambio();
+
+async function cargarRiesgoPais() {
+  const cont = document.getElementById("riesgo-pais");
+  try {
+    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo");
+    if (!res.ok) throw new Error("bad response");
+    const d = await res.json(); // { fecha: "YYYY-MM-DD", valor: number }
+    const prevRaw = localStorage.getItem("prevRiesgoPais");
+    const prev = prevRaw ? parseFloat(prevRaw) : null;
+    const variacion = prev ? Math.round(((d.valor - prev) / prev) * 1000) / 10 : 0;
+    const flat = variacion === 0, positive = variacion > 0;
+    const color = flat ? "var(--muted)" : positive ? "var(--neg)" : "var(--pos)"; // para riesgo país, SUBIR es negativo
+    const bg = flat ? "transparent" : positive ? "rgba(178,58,58,0.1)" : "rgba(47,125,79,0.1)";
+    const arrow = flat ? "–" : positive ? "▲" : "▼";
+    const fechaFmt = new Date(d.fecha + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    cont.innerHTML = `
+      <div class="card">
+        <div class="variacion" style="color:${color};background:${bg}">${arrow} ${Math.abs(variacion)}%</div>
+        <div class="label">Riesgo país (EMBI+)</div>
+        <div class="valor">${Math.round(d.valor)} pb</div>
+        <div class="fecha-dato">Dato: ${fechaFmt}</div>
+        <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">¿Qué es esto? ▾</button>
+        <div class="def">Sobretasa que exige el mercado a la deuda argentina sobre bonos del Tesoro de EEUU. A mayor valor, mayor percepción de riesgo de default.<br/><a class="fuente" href="https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo" target="_blank" rel="noreferrer">Ver fuente (ArgentinaDatos) ↗</a></div>
+      </div>`;
+    localStorage.setItem("prevRiesgoPais", String(d.valor));
+  } catch (e) {
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>No se pudo consultar en vivo ahora mismo.</div>";
+  }
+}
+cargarRiesgoPais();
+</script>
+</body>
+</html>
