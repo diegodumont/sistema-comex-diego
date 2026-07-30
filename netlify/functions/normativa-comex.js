@@ -38,19 +38,28 @@ exports.handler = async function () {
       .replace(/&aacute;/g, "á").replace(/&eacute;/g, "é").replace(/&iacute;/g, "í")
       .replace(/&oacute;/g, "ó").replace(/&uacute;/g, "ú").replace(/&ntilde;/g, "ñ");
 
-    // Partimos en líneas/fragmentos y buscamos los que contengan alguna palabra clave
-    const fragmentos = texto.split("\n").map((l) => l.trim()).filter((l) => l.length > 25);
+    // Partimos en líneas/fragmentos
+    const fragmentosCrudos = texto.split("\n").map((l) => l.trim()).filter((l) => l.length > 15);
+
+    // Un fragmento cuenta como "norma real" solo si además de la palabra clave
+    // tiene marca de instrumento legal (Resolución, Decreto, Disposición o su código)
+    const MARCA_NORMA = /(resoluci[oó]n|decreto|disposici[oó]n|resoluci[oó]n general|resog|decto|dispo|decnu|ley\s)/i;
+
     const vistos = new Set();
     const coincidencias = [];
 
-    fragmentos.forEach((frag) => {
-      const lower = frag.toLowerCase();
-      const match = KEYWORDS.find((kw) => lower.includes(kw));
-      if (match && !vistos.has(frag)) {
-        vistos.add(frag);
-        coincidencias.push({ texto: frag.slice(0, 300), palabraClave: match });
-      }
-    });
+    for (let i = 0; i < fragmentosCrudos.length; i++) {
+      // Juntamos el fragmento actual con el siguiente para no perder título+descripción partidos en dos líneas
+      const combinado = (fragmentosCrudos[i] + " " + (fragmentosCrudos[i + 1] || "")).trim();
+      const lower = combinado.toLowerCase();
+      const kw = KEYWORDS.find((k) => lower.includes(k));
+      if (!kw || !MARCA_NORMA.test(combinado)) continue;
+
+      const clave = combinado.slice(0, 60); // para deduplicar por inicio de texto
+      if (vistos.has(clave)) continue;
+      vistos.add(clave);
+      coincidencias.push({ texto: combinado.slice(0, 320), palabraClave: kw });
+    }
 
     return {
       statusCode: 200,
