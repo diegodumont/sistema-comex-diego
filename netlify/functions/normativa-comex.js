@@ -15,6 +15,10 @@ const KEYWORDS = [
   "zona primaria", "servicios extraordinarios", "dumping", "antidumping",
 ];
 
+// Requiere que el título tenga una referencia real de norma (no un simple "Aviso Oficial" administrativo
+// de una aduana puntual, que es ruido: edictos, decomisos, notificaciones judiciales, etc.)
+const TIENE_REFERENCIA_NORMA = /(resoluci[oó]n(\s+general)?|decreto|disposici[oó]n)\s*n?[º°]?\.?\s*\d+/i;
+
 // Filtro amplio para decidir qué avisos vale la pena abrir y revisar a fondo
 const ORGANISMOS_CANDIDATOS = [
   "aduana", "arca", "comercio exterior", "economía", "economia",
@@ -37,8 +41,12 @@ function limpiarHTML(html) {
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, "\n")
     .replace(/&nbsp;/g, " ")
-    .replace(/&aacute;/g, "á").replace(/&eacute;/g, "é").replace(/&iacute;/g, "í")
-    .replace(/&oacute;/g, "ó").replace(/&uacute;/g, "ú").replace(/&ntilde;/g, "ñ")
+    .replace(/&aacute;/gi, "á").replace(/&eacute;/gi, "é").replace(/&iacute;/gi, "í")
+    .replace(/&oacute;/gi, "ó").replace(/&uacute;/gi, "ú").replace(/&ntilde;/gi, "ñ")
+    .replace(/&Aacute;/g, "Á").replace(/&Eacute;/g, "É").replace(/&Iacute;/g, "Í")
+    .replace(/&Oacute;/g, "Ó").replace(/&Uacute;/g, "Ú").replace(/&Ntilde;/g, "Ñ")
+    // Entidades numéricas genéricas (&#243; por ej.), cubre lo que las nombradas no capturen
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
     // Boilerplate que se repite en todas las páginas del sitio, no aporta nada
     .replace(/Al hacer clic en este enlace[^.]*\./gi, " ")
     .replace(/usted (está siendo dirigido|acepta ser dirigido)[^.]*\./gi, " ")
@@ -46,13 +54,13 @@ function limpiarHTML(html) {
 }
 
 // De un texto largo, devuelve la oración (o par de oraciones) donde aparece la palabra clave,
-// en vez de mostrar siempre desde el principio del documento.
+// buscando en todo el cuerpo (no solo salteando el encabezado). Si no la encuentra,
+// devuelve null en vez de repetir texto de encabezado sin sentido.
 function extraerContexto(textoPlano, keyword) {
-  const oraciones = textoPlano.split(/(?<=[.;])\s+/).map((o) => o.trim()).filter((o) => o.length > 10);
+  const oraciones = textoPlano.split(/(?<=[.;])\s+/).map((o) => o.trim()).filter((o) => o.length > 15);
   const idx = oraciones.findIndex((o) => o.toLowerCase().includes(keyword));
-  if (idx === -1) return textoPlano.slice(0, 280);
-  const desde = Math.max(0, idx);
-  return oraciones.slice(desde, desde + 2).join(" ").slice(0, 320);
+  if (idx === -1) return null;
+  return oraciones.slice(idx, idx + 2).join(" ").slice(0, 320);
 }
 
 async function fetchConTimeout(url, ms) {
@@ -92,10 +100,12 @@ exports.handler = async function () {
       avisos.push({ href: "https://www.boletinoficial.gob.ar" + href, titulo: tituloCrudo });
     }
 
-    // Pasada 1: preseleccionamos por organismo (candidatos amplios)
+    // Pasada 1: preseleccionamos por organismo (candidatos amplios) Y que tengan
+    // una referencia real de norma (no un "Aviso Oficial" administrativo de rutina)
     const candidatos = avisos.filter((a) => {
       const lower = a.titulo.toLowerCase();
-      return ORGANISMOS_CANDIDATOS.some((org) => lower.includes(org));
+      const esOrganismoRelevante = ORGANISMOS_CANDIDATOS.some((org) => lower.includes(org));
+      return esOrganismoRelevante && TIENE_REFERENCIA_NORMA.test(a.titulo);
     }).slice(0, 20); // límite para no exceder el tiempo de la función
 
     // Pasada 2: abrimos cada candidato y buscamos las palabras clave exactas en el texto completo
@@ -112,7 +122,7 @@ exports.handler = async function () {
           const contexto = extraerContexto(textoDetalle, kw);
           resultados.push({
             titulo: c.titulo.slice(0, 140),
-            texto: contexto,
+            texto: contexto, // puede ser null — el front-end decide si lo muestra
             palabraClave: kw,
             fuente: c.href,
           });
