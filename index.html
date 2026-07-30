@@ -176,7 +176,7 @@ async function cargarNormativaComex() {
     }
 
     const items = data.resultados.map((r) =>
-      `<li><b>${r.titulo}</b> <span style="color:var(--muted);font-size:11px;">[${r.palabraClave}]</span><br/>${r.texto} — <a class="fuente" href="${r.fuente}" target="_blank" rel="noreferrer">ver aviso ↗</a></li>`
+      `<li><b>${r.titulo}</b> <span style="color:var(--muted);font-size:11px;">[${r.palabraClave}]</span>${r.texto ? "<br/>" + r.texto : ""} — <a class="fuente" href="${r.fuente}" target="_blank" rel="noreferrer">ver aviso ↗</a></li>`
     ).join("");
 
     cont.innerHTML = `
