@@ -53,26 +53,12 @@
 
   <div class="section">
     <div class="section-title">Noticias Argentina</div>
-    <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:10px;">
-      ● Carga manual — Tarifar bloquea el acceso automático, no se puede automatizar sin su permiso
-    </div>
-    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin-bottom:10px;">Normativa Comex del día</div>
-    <div class="grid" style="grid-template-columns: 1fr;">
-      <div class="card">
-        <div class="label">30/07/2026</div>
-        <ul style="margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink-soft);">
-          <li><b>Dumping — Res. ME Nº 1155/2026:</b> apertura de examen por expiración de plazo de medidas antidumping a bornes de conexión eléctrica de China y Alemania.</li>
-          <li><b>Dumping — Res. ME Nº 1156/2026:</b> cierre de examen de medidas antidumping a hornos eléctricos domésticos de China.</li>
-          <li><b>Envíos postales — Res. Gral. ARCA Nº 5884/2026:</b> nuevo procedimiento para recepción de envíos internacionales vía operador postal, incluido puerta a puerta.</li>
-          <li><b>RIGI — Res. SM Nº 60/2026:</b> sustitución del listado de mercaderías del proyecto minero "Rincón" (Rincón Mining).</li>
-          <li><b>RIGI — Res. ME Nº 1154/2026:</b> adhesión al régimen para proyecto de exportación estratégica de minería, presentado por Vicuña Argentina SA.</li>
-        </ul>
-        <a class="fuente" href="https://web.tarifar.com/" target="_blank" rel="noreferrer" style="display:block;margin-top:10px;">Ver Tarifar ↗</a>
-      </div>
-    </div>
+    <div class="live-status" id="normativa-status">Consultando Boletín Oficial…</div>
+    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Normativa Comex del día</div>
+    <div id="normativa-comex"></div>
   </div>
 
-  <div class="footer-note">Tipos de cambio y Riesgo país: en vivo · Normativa Comex: carga manual diaria (Tarifar) · resto de las secciones: próxima etapa</div>
+  <div class="footer-note">Tipos de cambio, Riesgo país y Normativa Comex: consulta en vivo · resto de las secciones: próxima etapa</div>
 </div>
 
 <script>
@@ -171,6 +157,41 @@ async function cargarRiesgoPais() {
   }
 }
 cargarRiesgoPais();
+
+async function cargarNormativaComex() {
+  const statusEl = document.getElementById("normativa-status");
+  const cont = document.getElementById("normativa-comex");
+  try {
+    const res = await fetch("/.netlify/functions/normativa-comex");
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (data.error) throw new Error(data.mensaje);
+
+    statusEl.textContent = "● Consultado en vivo desde el Boletín Oficial — " + data.fecha;
+    statusEl.className = "live-status live-ok";
+
+    if (!data.resultados.length) {
+      cont.innerHTML = `<div class="card">Hoy no se detectaron referencias de comercio exterior en el Boletín Oficial (según las palabras clave configuradas). <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver Boletín Oficial ↗</a></div>`;
+      return;
+    }
+
+    const items = data.resultados.map((r) =>
+      `<li><b>[${r.palabraClave}]</b> ${r.texto}</li>`
+    ).join("");
+
+    cont.innerHTML = `
+      <div class="card">
+        <div class="label">${data.fecha}</div>
+        <ul style="margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink-soft);">${items}</ul>
+        <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer" style="display:block;margin-top:10px;">Ver Boletín Oficial ↗</a>
+      </div>`;
+  } catch (e) {
+    statusEl.textContent = "● No se pudo consultar el Boletín Oficial en vivo ahora mismo";
+    statusEl.className = "live-status live-err";
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>Sin datos disponibles ahora mismo.</div>";
+  }
+}
+cargarNormativaComex();
 </script>
 </body>
 </html>
