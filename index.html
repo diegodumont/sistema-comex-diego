@@ -176,14 +176,14 @@ async function cargarNormativaComex() {
     }
 
     const items = data.resultados.map((r) =>
-      `<li><b>[${r.palabraClave}]</b> ${r.texto}</li>`
+      `<li><b>[${r.palabraClave}]</b> ${r.texto} — <a class="fuente" href="${r.fuente}" target="_blank" rel="noreferrer">ver aviso ↗</a></li>`
     ).join("");
 
     cont.innerHTML = `
       <div class="card">
-        <div class="label">${data.fecha}</div>
+        <div class="label">${data.fecha} · ${data.totalCandidatosRevisados || 0} avisos candidatos revisados de ${data.totalAvisosDelDia || 0} publicados</div>
         <ul style="margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink-soft);">${items}</ul>
-        <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer" style="display:block;margin-top:10px;">Ver Boletín Oficial ↗</a>
+        <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer" style="display:block;margin-top:10px;">Ver sumario completo del día ↗</a>
       </div>`;
   } catch (e) {
     statusEl.textContent = "● No se pudo consultar el Boletín Oficial en vivo ahora mismo";
