@@ -44,6 +44,7 @@ exports.handler = async function () {
     }
     if (!res.ok) throw new Error("No se pudo descargar el PDF (status " + res.status + ")");
     const buffer = Buffer.from(await res.arrayBuffer());
+    const tamanioBuffer = buffer.length;
     const data = await pdf(buffer);
     const lineas = data.text.split("\n").map((l) => l.trim()).filter(Boolean);
 
@@ -88,7 +89,11 @@ exports.handler = async function () {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate" },
-      body: JSON.stringify({ fuente: url, eventos: proximos }),
+      body: JSON.stringify({
+        fuente: url,
+        eventos: proximos,
+        diagnostico: { statusHttp: res.status, tamanioBufferBytes: tamanioBuffer, totalLineasTexto: lineas.length, totalEventosEnTodoElPdf: eventos.length },
+      }),
     };
   } catch (e) {
     return {
