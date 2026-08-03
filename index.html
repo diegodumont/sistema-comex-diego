@@ -60,6 +60,10 @@
     <div class="live-status" id="indec-status" style="margin-top:22px;">Consultando calendario del INDEC…</div>
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Calendario INDEC</div>
     <div id="indec-calendario" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:4px 16px;"></div>
+
+    <div class="live-status" id="rem-status" style="margin-top:22px;">Consultando REM del BCRA…</div>
+    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">REM BCRA (datos del mes anterior)</div>
+    <div id="rem-bcra"></div>
   </div>
 
   <div class="footer-note">Tipos de cambio, Riesgo país y Normativa Comex: consulta en vivo · resto de las secciones: próxima etapa</div>
@@ -217,22 +221,16 @@ async function cargarCalendarioIndec() {
     statusEl.className = "live-status live-ok";
 
     if (!data.eventos.length) {
-      const diag = data.diagnostico;
-      const diagHtml = diag ? `<div style="margin-top:10px;padding:10px;background:#f5f5f0;border-radius:4px;font-size:11px;font-family:monospace;white-space:pre-wrap;">
-        <b>Diagnóstico temporal:</b>
-        Total líneas leídas del PDF: ${diag.totalLineas}
-        Total eventos detectados en TODO el PDF (antes de filtrar por fecha): ${diag.totalEventosParseadosEnTodoElPdf}
-        Primeras 10 líneas crudas: ${JSON.stringify(diag.primeras10LineasCrudas, null, 1)}
-        Primeros eventos parseados: ${JSON.stringify(diag.primeros3EventosParseados, null, 1)}
-      </div>` : "";
-      cont.innerHTML = `<div style="padding:16px 4px;color:var(--muted);font-size:13px;">Sin publicaciones programadas en los próximos 7 días. <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo ↗</a></div>${diagHtml}`;
+      cont.innerHTML = `<div style="padding:16px 4px;color:var(--muted);font-size:13px;">Sin publicaciones programadas en los próximos 7 días. <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo ↗</a></div>`;
       return;
     }
 
     cont.innerHTML = data.eventos.map((e) => `
       <div style="display:flex;gap:14px;padding:12px 4px;border-bottom:1px solid var(--line);">
         <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);width:70px;flex-shrink:0;">${e.fecha}</div>
-        <div style="font-size:14px;color:var(--ink);">${e.descripcion}</div>
+        <div style="font-size:14px;color:var(--ink);">
+          ${e.indicadores.map((ind) => `<div style="margin-bottom:4px;">${ind}</div>`).join("")}
+        </div>
       </div>`).join("") +
       `<div style="padding:10px 4px;"><a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo del semestre ↗</a></div>`;
   } catch (e) {
@@ -242,6 +240,50 @@ async function cargarCalendarioIndec() {
   }
 }
 cargarCalendarioIndec();
+
+async function cargarRemBcra() {
+  const statusEl = document.getElementById("rem-status");
+  const cont = document.getElementById("rem-bcra");
+  try {
+    const res = await fetch("/.netlify/functions/rem-bcra?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (data.error) throw new Error(data.mensaje);
+
+    statusEl.textContent = "● Consultado en vivo desde el BCRA — REM " + data.mesRem;
+    statusEl.className = "live-status live-ok";
+
+    const filasHtml = data.filas.map((f) => `
+      <tr>
+        <td style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;">${f.indicador}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-soft);">${f.dato || "—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-soft);">${f.proyeccion || "—"}</td>
+      </tr>`).join("");
+
+    cont.innerHTML = `
+      <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:16px;overflow-x:auto;">
+        <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:10px;">
+          Publicado: ${data.fechaPublicacion} · Datos referidos a ${data.mesRem}
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--ink);">Indicador</th>
+              <th style="text-align:left;padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--ink);">Dato del REM</th>
+              <th style="text-align:left;padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--ink);">Proyección año en curso</th>
+            </tr>
+          </thead>
+          <tbody>${filasHtml}</tbody>
+        </table>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;">Próximo REM: aproximadamente la primera semana del mes que viene. <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver informe completo ↗</a></div>
+      </div>`;
+  } catch (e) {
+    statusEl.textContent = "● No se pudo consultar el REM en vivo (" + (e.message || e) + ")";
+    statusEl.className = "live-status live-err";
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>Sin datos disponibles ahora mismo.</div>";
+  }
+}
+cargarRemBcra();
 </script>
 </body>
 </html>
