@@ -83,7 +83,16 @@ exports.handler = async function () {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fuente: url, eventos: proximos }),
+      body: JSON.stringify({
+        fuente: url,
+        eventos: proximos,
+        diagnostico: {
+          totalLineas: lineas.length,
+          totalEventosParseadosEnTodoElPdf: eventos.length,
+          primeras10LineasCrudas: lineas.slice(0, 10),
+          primeros3EventosParseados: eventos.slice(0, 3).map((e) => ({ fecha: e.fecha.toString(), descripcion: e.descripcion })),
+        },
+      }),
     };
   } catch (e) {
     return {
