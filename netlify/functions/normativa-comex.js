@@ -83,7 +83,7 @@ exports.handler = async function () {
   const urlSumario = `https://www.boletinoficial.gob.ar/seccion/primera/${fecha}`;
 
   try {
-    const res = await fetchConTimeout(urlSumario, 8000);
+    const res = await fetchConTimeout(urlSumario, 6000);
     if (!res.ok) throw new Error("No se pudo acceder al sumario (status " + res.status + ")");
     const html = await res.text();
 
@@ -100,19 +100,22 @@ exports.handler = async function () {
       avisos.push({ href: "https://www.boletinoficial.gob.ar" + href, titulo: tituloCrudo });
     }
 
-    // Pasada 1: preseleccionamos por organismo (candidatos amplios) Y que tengan
-    // una referencia real de norma (no un "Aviso Oficial" administrativo de rutina)
+    // Pasada 1: preseleccionamos si (a) el organismo parece relevante, O (b) el título
+    // ya contiene directamente alguna palabra clave (para no depender de reconocer
+    // siglas raras de organismos, como pasó con "SDGOAI")
     const candidatos = avisos.filter((a) => {
       const lower = a.titulo.toLowerCase();
+      if (!TIENE_REFERENCIA_NORMA.test(a.titulo)) return false;
       const esOrganismoRelevante = ORGANISMOS_CANDIDATOS.some((org) => lower.includes(org));
-      return esOrganismoRelevante && TIENE_REFERENCIA_NORMA.test(a.titulo);
-    }).slice(0, 20); // límite para no exceder el tiempo de la función
+      const tieneKeywordDirecta = KEYWORDS.some((k) => lower.includes(k));
+      return esOrganismoRelevante || tieneKeywordDirecta;
+    }).slice(0, 15); // bajamos el límite para evitar timeout de la función
 
     // Pasada 2: abrimos cada candidato y buscamos las palabras clave exactas en el texto completo
     const resultados = [];
     await Promise.all(candidatos.map(async (c) => {
       try {
-        const r = await fetchConTimeout(c.href, 5000);
+        const r = await fetchConTimeout(c.href, 3500);
         if (!r.ok) return;
         const detalleHtml = await r.text();
         const textoDetalle = limpiarHTML(detalleHtml).replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
