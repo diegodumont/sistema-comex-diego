@@ -50,49 +50,45 @@ exports.handler = async function () {
     const regexFecha = /^(\d{1,2})(LU|MA|MI|JU|VI|SA|DO)(.*)/;
     const eventos = [];
     let mesActual = null;
-    let ultimoEvento = null;
+    let diaActual = null;
 
     lineas.forEach((linea) => {
       const lower = linea.toLowerCase();
       if (NOMBRES_MES.includes(lower)) {
         mesActual = lower;
-        ultimoEvento = null;
+        diaActual = null;
         return;
       }
+      if (/^actualizado/i.test(linea) || /^calendario de difusi/i.test(linea) || linea.length <= 3) return;
+
       const m = linea.match(regexFecha);
       if (m && mesActual) {
-        const dia = parseInt(m[1], 10);
-        const descripcion = m[3].trim();
-        const fechaEvento = new Date(anio, MESES[mesActual], dia);
-        ultimoEvento = { fecha: fechaEvento, descripcion };
-        eventos.push(ultimoEvento);
-      } else if (ultimoEvento && linea.length > 3 && !/^actualizado/i.test(linea) && !/^calendario de difusi/i.test(linea)) {
-        // Línea de continuación (el indicador sigue en el renglón siguiente)
-        ultimoEvento.descripcion += " " + linea;
+        diaActual = parseInt(m[1], 10);
+        eventos.push({ fecha: new Date(anio, MESES[mesActual], diaActual), descripcion: m[3].trim() });
+      } else if (diaActual !== null && mesActual) {
+        // Línea sin fecha propia: es OTRO indicador del mismo día (el PDF solo marca
+        // la fecha en el primer indicador de cada día), no una continuación de texto.
+        eventos.push({ fecha: new Date(anio, MESES[mesActual], diaActual), descripcion: linea.trim() });
       }
     });
 
-    const proximos = eventos
+    const enVentana = eventos
       .filter((e) => e.fecha >= hoy && e.fecha <= limite)
-      .sort((a, b) => a.fecha - b.fecha)
-      .map((e) => ({
-        fecha: e.fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }),
-        descripcion: e.descripcion.replace(/\s+/g, " ").trim(),
-      }));
+      .sort((a, b) => a.fecha - b.fecha);
+
+    // Agrupamos por fecha: si un día tiene varios indicadores, quedan juntos en una lista
+    const porFecha = new Map();
+    enVentana.forEach((e) => {
+      const key = e.fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      if (!porFecha.has(key)) porFecha.set(key, []);
+      porFecha.get(key).push(e.descripcion.replace(/\s+/g, " ").trim());
+    });
+    const proximos = Array.from(porFecha.entries()).map(([fecha, indicadores]) => ({ fecha, indicadores }));
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate" },
-      body: JSON.stringify({
-        fuente: url,
-        eventos: proximos,
-        diagnostico: {
-          totalLineas: lineas.length,
-          totalEventosParseadosEnTodoElPdf: eventos.length,
-          primeras10LineasCrudas: lineas.slice(0, 10),
-          primeros3EventosParseados: eventos.slice(0, 3).map((e) => ({ fecha: e.fecha.toString(), descripcion: e.descripcion })),
-        },
-      }),
+      body: JSON.stringify({ fuente: url, eventos: proximos }),
     };
   } catch (e) {
     return {
