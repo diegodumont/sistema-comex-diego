@@ -217,7 +217,15 @@ async function cargarCalendarioIndec() {
     statusEl.className = "live-status live-ok";
 
     if (!data.eventos.length) {
-      cont.innerHTML = `<div style="padding:16px 4px;color:var(--muted);font-size:13px;">Sin publicaciones programadas en los próximos 7 días. <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo ↗</a></div>`;
+      const diag = data.diagnostico;
+      const diagHtml = diag ? `<div style="margin-top:10px;padding:10px;background:#f5f5f0;border-radius:4px;font-size:11px;font-family:monospace;white-space:pre-wrap;">
+        <b>Diagnóstico temporal:</b>
+        Total líneas leídas del PDF: ${diag.totalLineas}
+        Total eventos detectados en TODO el PDF (antes de filtrar por fecha): ${diag.totalEventosParseadosEnTodoElPdf}
+        Primeras 10 líneas crudas: ${JSON.stringify(diag.primeras10LineasCrudas, null, 1)}
+        Primeros eventos parseados: ${JSON.stringify(diag.primeros3EventosParseados, null, 1)}
+      </div>` : "";
+      cont.innerHTML = `<div style="padding:16px 4px;color:var(--muted);font-size:13px;">Sin publicaciones programadas en los próximos 7 días. <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo ↗</a></div>${diagHtml}`;
       return;
     }
 
