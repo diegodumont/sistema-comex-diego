@@ -105,7 +105,7 @@ async function cargarTiposCambio() {
   const statusEl = document.getElementById("live-status");
   const cont = document.getElementById("tipos-cambio");
   try {
-    const res = await fetch("https://dolarapi.com/v1/dolares");
+    const res = await fetch("https://dolarapi.com/v1/dolares?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("bad response");
     const data = await res.json();
     const prevRaw = localStorage.getItem("prevDolares");
@@ -135,7 +135,7 @@ cargarTiposCambio();
 async function cargarRiesgoPais() {
   const cont = document.getElementById("riesgo-pais");
   try {
-    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo");
+    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("bad response");
     const d = await res.json(); // { fecha: "YYYY-MM-DD", valor: number }
     const prevRaw = localStorage.getItem("prevRiesgoPais");
@@ -166,7 +166,7 @@ async function cargarNormativaComex() {
   const statusEl = document.getElementById("normativa-status");
   const cont = document.getElementById("normativa-comex");
   try {
-    const res = await fetch("/.netlify/functions/normativa-comex");
+    const res = await fetch("/.netlify/functions/normativa-comex?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("bad response");
     const data = await res.json();
     if (data.error) throw new Error(data.mensaje);
@@ -201,7 +201,7 @@ async function cargarCalendarioIndec() {
   const statusEl = document.getElementById("indec-status");
   const cont = document.getElementById("indec-calendario");
   try {
-    const res = await fetch("/.netlify/functions/calendario-indec");
+    const res = await fetch("/.netlify/functions/calendario-indec?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("bad response");
     const data = await res.json();
     if (data.error) {
