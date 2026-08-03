@@ -59,9 +59,14 @@ exports.handler = async function () {
     const fechaPublicacion = buscar(t, /publicado el día (\d{1,2} de \w+ de \d{4})/i);
 
     const inflacionMensual = buscar(t, /inflaci[oó]n mensual de ([\d,]+%) para \w+/i);
-    const inflacionNucleo = buscar(t, /IPC N[uú]cleo[^.]*?en ([\d,]+%)/i);
+    const inflacionNucleo = buscar(t, /inflaci[oó]n n[uú]cleo[^.]*?(?:ubic[oó]|estim[oó])[^.]*?en ([\d,]+%)/i);
 
-    const desempleo = buscar(t, /desocupaci[oó]n (?:abierta )?(?:para[^.]*?)?(?:de |fue de )?([\d,]+%) de la PEA/i);
+    // Desempleo: dato del trimestre relevado + proyección a fin de año
+    const desempleoMatch = t.match(/desocupaci[oó]n abierta para el (\w+ trimestre) de \d{4}[^.]*?estimada[^.]*?en ([\d,]+%)/i);
+    const desempleoProyMatch = t.match(/tasa de ([\d,]+%) para el (\w+ trimestre) del año/i);
+
+    // PIB: crecimiento anual proyectado para el año en curso respecto del año anterior
+    const pibAnualMatch = t.match(/nivel de PIB real ([\d,]+%) superior al promedio de (\d{4})/i);
 
     const tipoCambioMatch = t.match(/tipo de cambio nominal de \$?([\d.,]+) por d[oó]lar para (\w+)/i);
 
@@ -71,12 +76,12 @@ exports.handler = async function () {
 
     const resultadoFiscal = buscar(t, /resultado fiscal primario[^.]*?super[aá]vit de \$?([\d.,]+) billones para (\d{4})/i);
 
-    const pibTrimestre = buscar(t, /PIB[^.]*?(?:variaci[oó]n|creci[oó])[^.]*?([\d,]+%)/i);
 
     const filas = [
-      { indicador: "Inflación (IPC nivel general)", dato: inflacionMensual ? `${mesRem}: ${inflacionMensual} mensual` : null, proyeccion: inflacionNucleo ? `IPC Núcleo: ${inflacionNucleo}` : null },
-      { indicador: "Actividad económica (PIB)", dato: pibTrimestre ? `Variación relevada: ${pibTrimestre}` : null, proyeccion: null },
-      { indicador: "Desempleo", dato: desempleo ? `${desempleo} de la PEA` : null, proyeccion: null },
+      { indicador: "Inflación (IPC nivel general)", dato: inflacionMensual ? `${mesRem}: ${inflacionMensual} mensual` : null, proyeccion: null },
+      { indicador: "Inflación núcleo (IPC Núcleo)", dato: inflacionNucleo ? `${mesRem}: ${inflacionNucleo} mensual` : null, proyeccion: null },
+      { indicador: "Actividad económica (PIB)", dato: null, proyeccion: pibAnualMatch ? `+${pibAnualMatch[1]} respecto al promedio de ${pibAnualMatch[2]}` : null },
+      { indicador: "Desempleo", dato: desempleoMatch ? `${desempleoMatch[1]}: ${desempleoMatch[2]} de la PEA` : null, proyeccion: desempleoProyMatch ? `${desempleoProyMatch[2]}: ${desempleoProyMatch[1]}` : null },
       { indicador: "Tipo de cambio", dato: tipoCambioMatch ? `$${tipoCambioMatch[1]} por dólar (${tipoCambioMatch[2]})` : null, proyeccion: null },
       { indicador: "Exportaciones (FOB)", dato: null, proyeccion: exportaciones ? `USD ${exportaciones} millones` : null },
       { indicador: "Importaciones (CIF)", dato: null, proyeccion: importaciones ? `USD ${importaciones} millones` : null },
