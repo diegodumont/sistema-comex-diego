@@ -47,7 +47,7 @@ exports.handler = async function () {
     const data = await pdf(buffer);
     const lineas = data.text.split("\n").map((l) => l.trim()).filter(Boolean);
 
-    const regexFecha = /^(\d{1,2})\s+(LU|MA|MI|JU|VI|SA|DO)\s+(.*)/;
+    const regexFecha = /^(\d{1,2})(LU|MA|MI|JU|VI|SA|DO)(.*)/;
     const eventos = [];
     let mesActual = null;
     let ultimoEvento = null;
