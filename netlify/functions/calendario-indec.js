@@ -45,7 +45,25 @@ exports.handler = async function () {
     if (!res.ok) throw new Error("No se pudo descargar el PDF (status " + res.status + ")");
     const buffer = Buffer.from(await res.arrayBuffer());
     const tamanioBuffer = buffer.length;
-    const data = await pdf(buffer);
+    // Forzamos que el texto se arme respetando el orden visual (posición en la página),
+    // en vez de dejar que la librería decida el orden — esto evita que columnas o bloques
+    // se mezclen de forma inconsistente entre distintas ejecuciones.
+    const pagerender = (pageData) => {
+      const opciones = { normalizeWhitespace: false, disableCombineTextItems: false };
+      return pageData.getTextContent(opciones).then((textContent) => {
+        let lineas = {};
+        textContent.items.forEach((item) => {
+          const y = Math.round(item.transform[5]);
+          if (!lineas[y]) lineas[y] = [];
+          lineas[y].push({ x: item.transform[4], texto: item.str });
+        });
+        return Object.keys(lineas)
+          .sort((a, b) => b - a) // de arriba hacia abajo
+          .map((y) => lineas[y].sort((a, b) => a.x - b.x).map((i) => i.texto).join(""))
+          .join("\n");
+      });
+    };
+    const data = await pdf(buffer, { pagerender });
     const lineas = data.text.split("\n").map((l) => l.trim()).filter(Boolean);
 
     const regexFecha = /^(\d{1,2})(LU|MA|MI|JU|VI|SA|DO)(.*)/;
