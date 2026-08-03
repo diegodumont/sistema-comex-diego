@@ -92,7 +92,11 @@ exports.handler = async function () {
       body: JSON.stringify({
         fuente: url,
         eventos: proximos,
-        diagnostico: { statusHttp: res.status, tamanioBufferBytes: tamanioBuffer, totalLineasTexto: lineas.length, totalEventosEnTodoElPdf: eventos.length },
+        diagnostico: {
+          statusHttp: res.status, tamanioBufferBytes: tamanioBuffer, totalLineasTexto: lineas.length, totalEventosEnTodoElPdf: eventos.length,
+          hoyCalculado: hoy.toISOString(), limiteCalculado: limite.toISOString(),
+          primeros5EventosCrudos: eventos.slice(0, 5).map((e) => ({ fecha: e.fecha.toISOString(), descripcion: e.descripcion.slice(0, 60) })),
+        },
       }),
     };
   } catch (e) {
