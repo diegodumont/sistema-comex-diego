@@ -59,7 +59,7 @@ exports.handler = async function () {
     const fechaPublicacion = buscar(t, /publicado el día (\d{1,2} de \w+ de \d{4})/i);
 
     const inflacionMensual = buscar(t, /inflaci[oó]n mensual de ([\d,]+%) para \w+/i);
-    const inflacionNucleo = buscar(t, /inflaci[oó]n n[uú]cleo[^.]*?(?:ubic[oó]|estim[oó])[^.]*?en ([\d,]+%)/i);
+    const inflacionNucleo = buscar(t, /IPC N[uú]cleo[^.]*?en ([\d,]+%)/i);
 
     // Desempleo: dato del trimestre relevado + proyección a fin de año
     const desempleoMatch = t.match(/desocupaci[oó]n abierta para el (\w+ trimestre) de \d{4}[^.]*?estimada[^.]*?en ([\d,]+%)/i);
@@ -68,7 +68,10 @@ exports.handler = async function () {
     // PIB: crecimiento anual proyectado para el año en curso respecto del año anterior
     const pibAnualMatch = t.match(/nivel de PIB real ([\d,]+%) superior al promedio de (\d{4})/i);
 
-    const tipoCambioMatch = t.match(/tipo de cambio nominal de \$?([\d.,]+) por d[oó]lar para (\w+)/i);
+    const tipoCambioMatch = t.match(/tipo de cambio nominal se ubic[oó] en \$?([\d.,]+) por d[oó]lar para el promedio de (\w+)/i);
+    const tipoCambioDicMatch = t.match(/diciembre de (\d{4}) el conjunto de participantes pronostic[oó] un tipo de cambio nominal de \$?([\d.,]+)\/?USD?[^.]*?variaci[oó]n interanual esperada de ([\d,]+%)/i);
+
+
 
     const exportaciones = buscar(t, /exportaciones \(FOB\) totalicen USD ?([\d.,]+) millones/i);
     const importaciones = buscar(t, /importaciones \(CIF\) USD ?([\d.,]+) millones/i);
@@ -82,7 +85,7 @@ exports.handler = async function () {
       { indicador: "Inflación núcleo (IPC Núcleo)", dato: inflacionNucleo ? `${mesRem}: ${inflacionNucleo} mensual` : null, proyeccion: null },
       { indicador: "Actividad económica (PIB)", dato: null, proyeccion: pibAnualMatch ? `+${pibAnualMatch[1]} respecto al promedio de ${pibAnualMatch[2]}` : null },
       { indicador: "Desempleo", dato: desempleoMatch ? `${desempleoMatch[1]}: ${desempleoMatch[2]} de la PEA` : null, proyeccion: desempleoProyMatch ? `${desempleoProyMatch[2]}: ${desempleoProyMatch[1]}` : null },
-      { indicador: "Tipo de cambio", dato: tipoCambioMatch ? `$${tipoCambioMatch[1]} por dólar (${tipoCambioMatch[2]})` : null, proyeccion: null },
+      { indicador: "Tipo de cambio", dato: tipoCambioMatch ? `$${tipoCambioMatch[1]} por dólar (${tipoCambioMatch[2]})` : null, proyeccion: tipoCambioDicMatch ? `Diciembre: $${tipoCambioDicMatch[2]} por dólar (+${tipoCambioDicMatch[3]} interanual)` : null },
       { indicador: "Exportaciones (FOB)", dato: null, proyeccion: exportaciones ? `USD ${exportaciones} millones` : null },
       { indicador: "Importaciones (CIF)", dato: null, proyeccion: importaciones ? `USD ${importaciones} millones` : null },
       { indicador: "Saldo comercial", dato: null, proyeccion: saldoComercial ? `Superávit de USD ${saldoComercial} millones` : null },
