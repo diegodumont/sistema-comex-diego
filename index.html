@@ -234,7 +234,7 @@ async function cargarCalendarioIndec() {
       </div>`).join("") +
       `<div style="padding:10px 4px;"><a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo del semestre ↗</a></div>`;
   } catch (e) {
-    statusEl.textContent = "● No se pudo consultar el calendario INDEC en vivo ahora mismo";
+    statusEl.textContent = "● No se pudo consultar el calendario INDEC en vivo (" + (e.message || e) + ")";
     statusEl.className = "live-status live-err";
     cont.innerHTML = "<div style='color:var(--muted);font-size:13px;padding:10px 4px;'>Sin datos disponibles ahora mismo.</div>";
   }
