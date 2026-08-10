@@ -118,12 +118,13 @@ async function stooqSerie(candidatos) {
 // Devuelve la serie diaria de los últimos ~2 meses para calcular semana/mes.
 async function yahooSerie(symbol) {
   const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
+  let ultimoError = null;
   for (const host of hosts) {
     try {
       const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2mo`;
       const data = await fetchJson(url);
       const res = data && data.chart && data.chart.result && data.chart.result[0];
-      if (!res || !res.timestamp) continue;
+      if (!res || !res.timestamp) { ultimoError = new Error("respuesta sin datos"); continue; }
       const cierres = (res.indicators && res.indicators.quote && res.indicators.quote[0] && res.indicators.quote[0].close) || [];
       const serie = res.timestamp
         .map((t, i) => ({ fecha: new Date(t * 1000).toISOString().slice(0, 10), close: cierres[i] }))
@@ -136,11 +137,12 @@ async function yahooSerie(symbol) {
         else serie[serie.length - 1].close = meta.regularMarketPrice;
       }
       if (serie.length) return { symbol, ...resumirSerie(serie) };
+      ultimoError = new Error("serie vacía");
     } catch (e) {
-      /* probamos el otro host */
+      ultimoError = e; // guardamos el motivo (HTTP 403, timeout, etc.) y probamos el otro host
     }
   }
-  return null;
+  throw ultimoError || new Error("Yahoo sin respuesta");
 }
 
 // Prueba varias fuentes en orden y usa la primera que devuelva un precio.
@@ -190,21 +192,21 @@ const INSTRUMENTOS = [
     unidad: "US$/barril", decimales: 2,
     fuente: "Yahoo Finance · futuro front-month",
     fuenteUrl: "https://es.investing.com/commodities/brent-oil",
-    obtener: () => primero([() => yahooSerie("BZ=F"), () => stooqSerie(["cb.f", "sc.f"])]),
+    obtener: () => yahooSerie("BZ=F"),
   },
   {
     id: "wti", nombre: "Petróleo WTI", grupo: "petroleo",
     unidad: "US$/barril", decimales: 2,
     fuente: "Yahoo Finance · futuro front-month",
     fuenteUrl: "https://es.investing.com/commodities/crude-oil",
-    obtener: () => primero([() => yahooSerie("CL=F"), () => stooqSerie(["cl.f"])]),
+    obtener: () => yahooSerie("CL=F"),
   },
   {
     id: "oro", nombre: "Oro", grupo: "metal",
     unidad: "US$/onza", decimales: 2,
     fuente: "Yahoo Finance · oro COMEX (futuro)",
     fuenteUrl: "https://es.investing.com/currencies/xau-usd",
-    obtener: () => primero([() => yahooSerie("GC=F"), () => stooqSerie(["xauusd"])]),
+    obtener: () => yahooSerie("GC=F"),
   },
   {
     id: "bitcoin", nombre: "Bitcoin", grupo: "cripto",
@@ -225,21 +227,21 @@ const INSTRUMENTOS = [
     unidad: "¢US/bushel", decimales: 2,
     fuente: "Yahoo Finance · CBOT (referencia internacional)",
     fuenteUrl: "https://es.investing.com/commodities/us-soybeans",
-    obtener: () => primero([() => yahooSerie("ZS=F"), () => stooqSerie(["zs.f"])]),
+    obtener: () => yahooSerie("ZS=F"),
   },
   {
     id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano",
     unidad: "¢US/bushel", decimales: 2,
     fuente: "Yahoo Finance · CBOT (referencia internacional)",
     fuenteUrl: "https://es.investing.com/commodities/us-corn",
-    obtener: () => primero([() => yahooSerie("ZC=F"), () => stooqSerie(["zc.f"])]),
+    obtener: () => yahooSerie("ZC=F"),
   },
   {
     id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano",
     unidad: "¢US/bushel", decimales: 2,
     fuente: "Yahoo Finance · CBOT (referencia internacional)",
     fuenteUrl: "https://es.investing.com/commodities/us-wheat",
-    obtener: () => primero([() => yahooSerie("ZW=F"), () => stooqSerie(["zw.f"])]),
+    obtener: () => yahooSerie("ZW=F"),
   },
 ];
 
@@ -249,11 +251,16 @@ const GRANOS_BCR = {
   disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible",
 };
 
+function deadline(ms) {
+  return new Promise((_, rej) => setTimeout(() => rej(new Error("deadline " + ms + "ms")), ms));
+}
+
 exports.handler = async function () {
   // Blindaje total: pase lo que pase, la función responde 200 con JSON válido
-  // (nunca un 500/timeout que el panel leería como "bad response").
+  // dentro de los 8s (Netlify corta a los 10s), nunca un timeout que el panel
+  // leería como "bad response".
   try {
-    return await construir();
+    return await Promise.race([construir(), deadline(8000)]);
   } catch (e) {
     const instrumentos = INSTRUMENTOS.map((inst) => ({
       id: inst.id, nombre: inst.nombre, grupo: inst.grupo, unidad: inst.unidad,
@@ -288,7 +295,9 @@ async function construir() {
         symbol: v.symbol || null,
       };
     }
-    return { ...base, ok: false, precio: null, fecha: null, varSemana: null, varMes: null };
+    // Diagnóstico: por qué no salió (para poder ver el motivo abriendo la URL de la función)
+    const motivo = r.status === "rejected" ? String(r.reason && r.reason.message || r.reason) : "sin datos";
+    return { ...base, ok: false, precio: null, fecha: null, varSemana: null, varMes: null, motivo };
   });
 
   return {
