@@ -225,30 +225,100 @@ function granosCardHTML(granos, bcr) {
       </div>
     </div>`;
 }
+// Metadatos de cada instrumento (espejo de la función), para poder armar la sección
+// desde el navegador si el servidor no respondiera.
+const MERCADO_META = [
+  { id: "brent", nombre: "Petróleo Brent", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Stooq · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/brent-oil" },
+  { id: "wti", nombre: "Petróleo WTI", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Stooq · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/crude-oil" },
+  { id: "oro", nombre: "Oro", grupo: "metal", unidad: "US$/onza", decimales: 2, fuente: "Stooq · XAU/USD (spot)", fuenteUrl: "https://es.investing.com/currencies/xau-usd" },
+  { id: "bitcoin", nombre: "Bitcoin", grupo: "cripto", unidad: "US$", decimales: 0, fuente: "CoinGecko", fuenteUrl: "https://www.coingecko.com/es/monedas/bitcoin" },
+  { id: "eurusd", nombre: "Euro / Dólar", grupo: "divisa", unidad: "US$ por €", decimales: 4, fuente: "BCE · referencia diaria (Frankfurter)", fuenteUrl: "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html" },
+  { id: "soja", nombre: "Soja · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Stooq · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-soybeans" },
+  { id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Stooq · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-corn" },
+  { id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Stooq · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-wheat" },
+];
+const GRANOS_BCR_FALLBACK = { local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra", fob: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales-0", disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible" };
+
+function resumirSerieCli(serie) {
+  serie = serie.filter((p) => isFinite(p.close)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!serie.length) return null;
+  const last = serie[serie.length - 1];
+  const tMs = Date.parse(last.fecha + "T00:00:00Z");
+  const hace = (d) => { const o = tMs - d * 86400000; let e = null; for (const p of serie) { if (Date.parse(p.fecha + "T00:00:00Z") <= o) e = p; } return e || serie[0]; };
+  const sem = hace(7), mes = hace(30);
+  return { precio: last.close, fecha: last.fecha, varSemana: pct(last.close, sem.close), varMes: pct(last.close, mes.close), baseSemana: sem.close, baseMes: mes.close };
+}
+function metaInst(id, extra) { const m = MERCADO_META.find((x) => x.id === id); return Object.assign({}, m, { ok: false, precio: null, fecha: null, varSemana: null, varMes: null }, extra || {}); }
+
+async function bitcoinCli() {
+  const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=31&interval=daily", { cache: "no-store" });
+  if (!r.ok) throw new Error("cg");
+  const d = await r.json();
+  const serie = (d.prices || []).map(([ts, p]) => ({ fecha: new Date(ts).toISOString().slice(0, 10), close: p }));
+  const s = resumirSerieCli(serie);
+  if (!s) throw new Error("cg vacío");
+  return metaInst("bitcoin", Object.assign({ ok: true }, s));
+}
+async function eurusdCli() {
+  const hasta = new Date().toISOString().slice(0, 10);
+  const desde = new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10);
+  const r = await fetch("https://api.frankfurter.dev/v1/" + desde + ".." + hasta + "?base=EUR&symbols=USD", { cache: "no-store" });
+  if (!r.ok) throw new Error("frk");
+  const d = await r.json();
+  const serie = Object.keys(d.rates || {}).sort().map((f) => ({ fecha: f, close: d.rates[f].USD }));
+  const s = resumirSerieCli(serie);
+  if (!s) throw new Error("frk vacío");
+  return metaInst("eurusd", Object.assign({ ok: true }, s));
+}
+
+function pintarMercado(data) {
+  const cont = document.getElementById("mercado");
+  const orden = ["brent", "wti", "oro", "bitcoin", "eurusd"];
+  const principales = orden.map((id) => data.instrumentos.find((i) => i.id === id)).filter(Boolean);
+  const granos = data.instrumentos.filter((i) => i.grupo === "grano");
+  cont.innerHTML = principales.map(cardMktHTML).join("") + granosCardHTML(granos, data.granosBCR || GRANOS_BCR_FALLBACK);
+}
+
 async function cargarMercado() {
   const statusEl = document.getElementById("mercado-status");
-  const cont = document.getElementById("mercado");
+  const ahora = () => new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  let data = null;
   try {
     const res = await fetch("/.netlify/functions/mercado?t=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) throw new Error("bad response");
-    const data = await res.json();
+    if (res.ok) { const j = await res.json(); if (j && j.instrumentos && j.instrumentos.length) data = j; }
+  } catch (e) { /* pasamos al plan B del navegador */ }
+
+  if (data) {
     PANEL.mercado = data;
-    const orden = ["brent", "wti", "oro", "bitcoin", "eurusd"];
-    const principales = orden.map((id) => data.instrumentos.find((i) => i.id === id)).filter(Boolean);
-    const granos = data.instrumentos.filter((i) => i.grupo === "grano");
-    let html = principales.map(cardMktHTML).join("");
-    html += granosCardHTML(granos, data.granosBCR || {});
-    cont.innerHTML = html;
-    const okCount = data.instrumentos.filter((i) => i.ok).length;
-    const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
-    statusEl.textContent = "● Mercado consultado en vivo — " + okCount + "/" + data.instrumentos.length + " cotizaciones — " + ahora + "hs";
-    statusEl.className = "live-status " + (okCount ? "live-ok" : "live-err");
+    pintarMercado(data);
     renderResumen();
-  } catch (e) {
-    statusEl.textContent = "● No se pudo consultar el mercado en vivo (" + (e.message || e) + ")";
-    statusEl.className = "live-status live-err";
-    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>Sin datos de mercado ahora mismo.</div>";
+    const okCount = data.instrumentos.filter((i) => i.ok).length;
+    statusEl.textContent = "● Mercado consultado en vivo — " + okCount + "/" + data.instrumentos.length + " cotizaciones — " + ahora() + "hs";
+    statusEl.className = "live-status " + (okCount ? "live-ok" : "live-err");
+    // Si el servidor no trajo bitcoin o euro, los completamos desde el navegador
+    const faltaBtc = !data.instrumentos.find((i) => i.id === "bitcoin" && i.ok);
+    const faltaEur = !data.instrumentos.find((i) => i.id === "eurusd" && i.ok);
+    if (faltaBtc || faltaEur) {
+      const res2 = await Promise.allSettled([faltaBtc ? bitcoinCli() : null, faltaEur ? eurusdCli() : null].filter(Boolean));
+      let changed = false;
+      res2.forEach((r) => { if (r.status === "fulfilled" && r.value) { const i = data.instrumentos.findIndex((x) => x.id === r.value.id); if (i >= 0 && !data.instrumentos[i].ok) { data.instrumentos[i] = r.value; changed = true; } } });
+      if (changed) { pintarMercado(data); renderResumen(); }
+    }
+    return;
   }
+
+  // Plan B: el servidor no respondió. Armamos la sección desde el navegador
+  // (bitcoin y euro-dólar en vivo por CORS; el resto, enlace a la fuente).
+  const instrumentos = MERCADO_META.map((m) => metaInst(m.id));
+  const results = await Promise.allSettled([bitcoinCli(), eurusdCli()]);
+  results.forEach((r) => { if (r.status === "fulfilled" && r.value) { const i = instrumentos.findIndex((x) => x.id === r.value.id); if (i >= 0) instrumentos[i] = r.value; } });
+  data = { fecha: new Date().toISOString(), instrumentos, granosBCR: GRANOS_BCR_FALLBACK };
+  PANEL.mercado = data;
+  pintarMercado(data);
+  renderResumen();
+  const okCount = instrumentos.filter((i) => i.ok).length;
+  statusEl.textContent = "● Mercado: el servidor tardó en responder — mostrando " + okCount + " cotizaciones desde el navegador (bitcoin/euro) y el enlace a la fuente en el resto";
+  statusEl.className = "live-status live-err";
 }
 
 // ── HISTORIA DEL DÓLAR MAYORISTA (para la lectura de estabilidad del resumen) ──
