@@ -189,7 +189,7 @@ function comentarioMkt(inst) {
   return parts.length ? parts.join("; ") + "." : "Cotización disponible; sin historial suficiente para comparar todavía.";
 }
 function cardMktHTML(inst) {
-  const linkTxt = inst.id === "bitcoin" ? "Ver en CoinGecko" : inst.id === "eurusd" ? "Ver referencia BCE" : "Ver en Investing";
+  const linkTxt = inst.id === "bitcoin" ? "Ver en CoinGecko" : inst.id === "eurusd" ? "Ver referencia BCE" : "Ver en Yahoo Finance";
   return `
     <div class="card">
       ${badgeVar(inst.varSemana)}
@@ -228,14 +228,14 @@ function granosCardHTML(granos, bcr) {
 // Metadatos de cada instrumento (espejo de la función), para poder armar la sección
 // desde el navegador si el servidor no respondiera.
 const MERCADO_META = [
-  { id: "brent", nombre: "Petróleo Brent", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/brent-oil" },
-  { id: "wti", nombre: "Petróleo WTI", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/crude-oil" },
-  { id: "oro", nombre: "Oro", grupo: "metal", unidad: "US$/onza", decimales: 2, fuente: "Yahoo Finance · oro COMEX (futuro)", fuenteUrl: "https://es.investing.com/currencies/xau-usd" },
+  { id: "brent", nombre: "Petróleo Brent", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://finance.yahoo.com/quote/BZ=F" },
+  { id: "wti", nombre: "Petróleo WTI", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://finance.yahoo.com/quote/CL=F" },
+  { id: "oro", nombre: "Oro", grupo: "metal", unidad: "US$/onza", decimales: 2, fuente: "Yahoo Finance · oro COMEX (futuro)", fuenteUrl: "https://finance.yahoo.com/quote/GC=F" },
   { id: "bitcoin", nombre: "Bitcoin", grupo: "cripto", unidad: "US$", decimales: 0, fuente: "CoinGecko", fuenteUrl: "https://www.coingecko.com/es/monedas/bitcoin" },
   { id: "eurusd", nombre: "Euro / Dólar", grupo: "divisa", unidad: "US$ por €", decimales: 4, fuente: "BCE · referencia diaria (Frankfurter)", fuenteUrl: "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html" },
-  { id: "soja", nombre: "Soja · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-soybeans" },
-  { id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-corn" },
-  { id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-wheat" },
+  { id: "soja", nombre: "Soja · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://finance.yahoo.com/quote/ZS=F" },
+  { id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://finance.yahoo.com/quote/ZC=F" },
+  { id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://finance.yahoo.com/quote/ZW=F" },
 ];
 const GRANOS_BCR_FALLBACK = { local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra", fob: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales-0", disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible" };
 
@@ -281,9 +281,13 @@ async function eurusdCli() {
 // Yahoo Finance no envía cabeceras CORS, así que el navegador no puede leerlo
 // directo. Lo pedimos a través de un proxy CORS público (con uno de respaldo).
 // El dato sigue viniendo de Yahoo; el proxy es solo el "cartero".
+// Distintos "puentes" (proxies CORS). Yahoo bloquea a algunos, así que probamos
+// varios: el que primero devuelva el dato, gana. codetabs suele esquivar el bloqueo.
 const PROXIES = [
-  (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
-  (u) => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+  { url: (u) => "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u), envuelto: false },
+  { url: (u) => "https://api.allorigins.win/get?url=" + encodeURIComponent(u), envuelto: true },
+  { url: (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u), envuelto: false },
+  { url: (u) => "https://thingproxy.freeboard.io/fetch/" + u, envuelto: false },
 ];
 const YMAP = { brent: "BZ=F", wti: "CL=F", oro: "GC=F", soja: "ZS=F", maiz: "ZC=F", trigo: "ZW=F" };
 
@@ -292,9 +296,11 @@ async function yahooCli(symbol) {
   let ultimoError = null;
   for (const px of PROXIES) {
     try {
-      const r = await fetchTO(px(target), 7000);
+      const r = await fetchTO(px.url(target), 7000);
       if (!r.ok) { ultimoError = new Error("HTTP " + r.status); continue; }
-      const data = await r.json();
+      let data;
+      if (px.envuelto) { const w = await r.json(); data = JSON.parse(w.contents); } // allorigins/get -> {contents}
+      else { data = await r.json(); }
       const res = data && data.chart && data.chart.result && data.chart.result[0];
       if (!res || !res.timestamp) { ultimoError = new Error("sin datos"); continue; }
       const cl = (res.indicators && res.indicators.quote && res.indicators.quote[0] && res.indicators.quote[0].close) || [];
