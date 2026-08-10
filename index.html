@@ -195,7 +195,7 @@ function cardMktHTML(inst) {
       ${badgeVar(inst.varSemana)}
       <div class="label">${inst.nombre}</div>
       <div class="valor">${precioMkt(inst)}</div>
-      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : "sin dato"} · ${inst.fuente}</div>
+      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : ("sin dato" + (inst.motivo ? " (" + inst.motivo + ")" : ""))} · ${inst.fuente}</div>
       <div class="mkt-com">${comentarioMkt(inst)}</div>
       <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">Ver fuente ▾</button>
       <div class="def"><a class="fuente" href="${inst.fuenteUrl}" target="_blank" rel="noreferrer">${linkTxt} ↗</a></div>
