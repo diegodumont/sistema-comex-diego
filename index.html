@@ -46,6 +46,35 @@
   .imp-low { background: rgba(124,136,145,0.14); color: var(--muted); }
   .cal-proxima { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
   .cal-proxima .cal-fecha { color: var(--ink); font-weight: 700; font-size: 13px; }
+
+  /* Recuadro RESUMEN (lectura del día) */
+  .resumen { background: linear-gradient(180deg,#fff, #FBFAF6); border: 1px solid var(--ink); border-radius: 6px; padding: 0; margin-bottom: 30px; overflow: hidden; box-shadow: 0 1px 0 rgba(28,43,58,0.04); }
+  .resumen-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--ink); }
+  .resumen-head .t { font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; }
+  .resumen-head .st { font-family: 'Space Mono', monospace; font-size: 10px; color: #C9D2DA; }
+  .resumen-body { max-height: 230px; overflow-y: auto; padding: 16px 18px; font-size: 14px; line-height: 1.62; color: var(--ink-soft); scrollbar-width: thin; }
+  .resumen-body::-webkit-scrollbar { width: 8px; }
+  .resumen-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  .resumen-body p { margin: 0 0 10px; }
+  .resumen-body b { color: var(--ink); }
+  .resumen-body .rp-frase { border-left: 3px solid var(--accent); padding-left: 10px; }
+  .resumen-alertas { margin-top: 4px; }
+  .resumen-alertas .a-item { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 13px; }
+  .resumen-alertas .a-item:first-child { border-top: none; }
+  .r-up { color: var(--pos); font-weight: 700; } .r-down { color: var(--neg); font-weight: 700; }
+  .r-tag { font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 3px; background: rgba(184,121,46,0.14); color: var(--accent); white-space: nowrap; }
+
+  /* Mercado */
+  .mkt-com { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 9px; margin-top: 10px; }
+  .mkt-var { display: flex; gap: 14px; margin-top: 8px; font-family: 'Space Mono', monospace; font-size: 12px; }
+  .mkt-var .k { color: var(--muted); }
+  .granos-card { grid-column: 1 / -1; }
+  .granos-mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; margin: 4px 0 12px; }
+  .granos-mini .g { border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px; }
+  .granos-mini .g .n { font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase; color: var(--muted); }
+  .granos-mini .g .p { font-family: 'Space Mono', monospace; font-size: 18px; margin-top: 2px; }
+  .granos-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .granos-links a { display: inline-block; background: var(--ink); color: #fff; font-family: 'Space Mono', monospace; font-size: 11px; text-decoration: none; padding: 8px 12px; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -54,6 +83,16 @@
     <div class="eyebrow" id="fecha-hoy"></div>
     <div class="title">Sistema de Información Económica y de Comercio Exterior — Diego Dumont</div>
     <div class="live-status" id="live-status">Consultando en vivo…</div>
+  </div>
+
+  <div class="resumen" id="resumen-box">
+    <div class="resumen-head">
+      <div class="t">Resumen del panel · Lectura del día</div>
+      <div class="st" id="resumen-status">Analizando los datos…</div>
+    </div>
+    <div class="resumen-body" id="resumen-body">
+      <p style="color:var(--muted);">Leyendo tipos de cambio, riesgo país, REM, mercado y calendarios para armar la lectura del día…</p>
+    </div>
   </div>
 
   <div class="section">
@@ -82,6 +121,15 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Mercado</div>
+    <div class="live-status" id="mercado-status">Consultando cotizaciones del mercado…</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 14px;line-height:1.55;">
+      Petróleo (Brent y WTI), oro, bitcoin y euro-dólar en vivo, con su fuente y su fecha, y un comentario automático de cómo vienen en la <b>última semana</b> y el <b>último mes</b>. Los granos incluyen la referencia internacional de Chicago y los enlaces oficiales de la Bolsa de Comercio de Rosario para el dato local argentino.
+    </div>
+    <div class="grid" id="mercado"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Calendario EEUU</div>
     <div class="live-status" id="cal-eeuu-status">Consultando calendario económico de EEUU…</div>
     <div style="font-size:12px;color:var(--muted);margin:6px 0 14px;line-height:1.55;">
@@ -90,7 +138,7 @@
     <div class="cal-grid" id="calendario-eeuu"></div>
   </div>
 
-  <div class="footer-note">Tipos de cambio, Riesgo país y Normativa Comex: consulta en vivo · Calendario EEUU: consenso y fecha en vivo (ForexFactory) la semana de cada publicación · resto de las secciones: próxima etapa</div>
+  <div class="footer-note">Tipos de cambio, Riesgo país, Normativa Comex y Mercado (petróleo, oro, bitcoin, euro-dólar y granos Chicago): consulta en vivo · Calendario EEUU: consenso y fecha en vivo (ForexFactory) la semana de cada publicación · Granos locales (BCR) e INDEC: enlace directo a la fuente oficial</div>
 </div>
 
 <script>
@@ -103,6 +151,225 @@ const DOLAR_CONFIG = [
 ];
 
 document.getElementById("fecha-hoy").textContent = "Actualizado — " + new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ESTADO COMPARTIDO DEL PANEL + HELPERS (para el recuadro RESUMEN y para MERCADO)
+// ═════════════════════════════════════════════════════════════════════════════
+const PANEL = { dolares: null, dolarHist: null, riesgo: null, rem: null, mercado: null, eeuu: null };
+
+function pct(a, b) { return (b == null || b === 0 || a == null) ? null : Math.round(((a - b) / b) * 1000) / 10; }
+function pctAbs(v) { return v == null ? "—" : Math.abs(v).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "%"; }
+function pctSigned(v) { return v == null ? "—" : (v > 0 ? "+" : "") + v.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "%"; }
+function palabraMov(v) { if (v == null) return "sin dato"; if (v > 0.05) return "subió"; if (v < -0.05) return "bajó"; return "se mantuvo estable"; }
+function fmtNum(n, dec) { return n == null ? "—" : Number(n).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+function money(n) { return n == null ? "—" : "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: n % 1 === 0 ? 0 : 2 }); }
+function fmtFechaCorta(f) { if (!f) return "—"; return new Date(f + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function getDolar(casa) { return PANEL.dolares ? PANEL.dolares.find((x) => x.casa === casa) : null; }
+function limpiarNombre(n) { return n.replace(/ · Chicago \(CBOT\)/, ""); }
+
+// ── MERCADO ──────────────────────────────────────────────────────────────────
+function precioMkt(inst) {
+  if (inst.precio == null) return "—";
+  const n = fmtNum(inst.precio, inst.decimales);
+  return (inst.grupo === "grano" ? "¢US " : "US$ ") + n;
+}
+function badgeVar(v) {
+  if (v == null) return `<div class="variacion" style="color:var(--muted);background:transparent">– s/d</div>`;
+  const pos = v > 0, flat = v === 0;
+  const color = flat ? "var(--muted)" : pos ? "var(--pos)" : "var(--neg)";
+  const bg = flat ? "transparent" : pos ? "rgba(47,125,79,0.1)" : "rgba(178,58,58,0.1)";
+  const arrow = flat ? "–" : pos ? "▲" : "▼";
+  return `<div class="variacion" style="color:${color};background:${bg}" title="Variación de la última semana">${arrow} ${pctAbs(v)} · 7d</div>`;
+}
+function comentarioMkt(inst) {
+  if (!inst.ok || inst.precio == null) return "Sin cotización automática ahora mismo — mirá la fuente para el valor actualizado.";
+  const parts = [];
+  if (inst.varSemana != null) parts.push(`Últimos 7 días: ${palabraMov(inst.varSemana)} ${pctAbs(inst.varSemana)} (de ${fmtNum(inst.baseSemana, inst.decimales)} a ${fmtNum(inst.precio, inst.decimales)})`);
+  if (inst.varMes != null) parts.push(`en el mes ${pctSigned(inst.varMes)}`);
+  return parts.length ? parts.join("; ") + "." : "Cotización disponible; sin historial suficiente para comparar todavía.";
+}
+function cardMktHTML(inst) {
+  const linkTxt = inst.id === "bitcoin" ? "Ver en CoinGecko" : inst.id === "eurusd" ? "Ver referencia BCE" : "Ver en Investing";
+  return `
+    <div class="card">
+      ${badgeVar(inst.varSemana)}
+      <div class="label">${inst.nombre}</div>
+      <div class="valor">${precioMkt(inst)}</div>
+      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : "sin dato"} · ${inst.fuente}</div>
+      <div class="mkt-com">${comentarioMkt(inst)}</div>
+      <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">Ver fuente ▾</button>
+      <div class="def"><a class="fuente" href="${inst.fuenteUrl}" target="_blank" rel="noreferrer">${linkTxt} ↗</a></div>
+    </div>`;
+}
+function granosCardHTML(granos, bcr) {
+  const minis = granos.map((g) => `
+      <div class="g">
+        <div class="n">${limpiarNombre(g.nombre)}</div>
+        <div class="p">${precioMkt(g)}</div>
+        <div style="font-size:11px;color:${g.varSemana == null ? "var(--muted)" : g.varSemana >= 0 ? "var(--pos)" : "var(--neg)"};font-family:'Space Mono',monospace;margin-top:2px;">${g.varSemana == null ? "s/d" : (g.varSemana >= 0 ? "▲ " : "▼ ") + pctAbs(g.varSemana) + " · 7d"}</div>
+      </div>`).join("");
+  return `
+    <div class="card granos-card">
+      <div class="label">Granos</div>
+      <div style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 8px;line-height:1.5;">
+        <b>Referencia internacional — Chicago (CBOT).</b> Son futuros del mercado de Chicago; <b>NO</b> son el FOB Argentina ni la pizarra local. Sirven para ver la tendencia global del grano.
+      </div>
+      <div class="granos-mini">${minis || "<span style='color:var(--muted)'>Sin datos de Chicago ahora mismo.</span>"}</div>
+      <div style="font-size:12.5px;color:var(--ink-soft);margin:4px 0 6px;line-height:1.5;">
+        <b>Dato local argentino</b> (pizarra Cámara Rosario en $/t y FOB Argentina Spot en US$/t). Se consulta directo en la fuente oficial de la Bolsa de Comercio de Rosario:
+      </div>
+      <div class="granos-links">
+        <a href="${bcr.local || "#"}" target="_blank" rel="noreferrer">Pizarra Cámara Rosario ($/t) ↗</a>
+        <a href="${bcr.disponible || "#"}" target="_blank" rel="noreferrer">Mercado disponible Rosario ↗</a>
+        <a href="${bcr.fob || "#"}" target="_blank" rel="noreferrer">FOB/FAS Argentina (US$/t) ↗</a>
+      </div>
+    </div>`;
+}
+async function cargarMercado() {
+  const statusEl = document.getElementById("mercado-status");
+  const cont = document.getElementById("mercado");
+  try {
+    const res = await fetch("/.netlify/functions/mercado?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    PANEL.mercado = data;
+    const orden = ["brent", "wti", "oro", "bitcoin", "eurusd"];
+    const principales = orden.map((id) => data.instrumentos.find((i) => i.id === id)).filter(Boolean);
+    const granos = data.instrumentos.filter((i) => i.grupo === "grano");
+    let html = principales.map(cardMktHTML).join("");
+    html += granosCardHTML(granos, data.granosBCR || {});
+    cont.innerHTML = html;
+    const okCount = data.instrumentos.filter((i) => i.ok).length;
+    const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    statusEl.textContent = "● Mercado consultado en vivo — " + okCount + "/" + data.instrumentos.length + " cotizaciones — " + ahora + "hs";
+    statusEl.className = "live-status " + (okCount ? "live-ok" : "live-err");
+    renderResumen();
+  } catch (e) {
+    statusEl.textContent = "● No se pudo consultar el mercado en vivo (" + (e.message || e) + ")";
+    statusEl.className = "live-status live-err";
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>Sin datos de mercado ahora mismo.</div>";
+  }
+}
+
+// ── HISTORIA DEL DÓLAR MAYORISTA (para la lectura de estabilidad del resumen) ──
+async function cargarHistoriaDolar() {
+  try {
+    const res = await fetch("https://api.argentinadatos.com/v1/cotizaciones/dolares/mayorista?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad");
+    let serie = await res.json();
+    serie = serie.filter((x) => x && x.fecha && isFinite(x.venta)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    if (!serie.length) throw new Error("vacía");
+    const last = serie[serie.length - 1];
+    const tMs = Date.parse(last.fecha + "T00:00:00Z");
+    const hace = (d) => { const o = tMs - d * 86400000; let e = null; for (const p of serie) { if (Date.parse(p.fecha + "T00:00:00Z") <= o) e = p; } return e || serie[0]; };
+    const sem = hace(7), mes = hace(30);
+    PANEL.dolarHist = { venta: last.venta, fecha: last.fecha, semAnt: sem.venta, mesAnt: mes.venta, varSem: pct(last.venta, sem.venta), varMes: pct(last.venta, mes.venta) };
+  } catch (e) { /* la lectura de estabilidad es opcional */ }
+  renderResumen();
+}
+
+// ── RESUMEN: lectura automática del día ───────────────────────────────────────
+function renderResumen() {
+  const body = document.getElementById("resumen-body");
+  const statusEl = document.getElementById("resumen-status");
+  if (!body) return;
+  const partes = [];
+  const alertas = [];
+
+  // 1) Tipos de cambio
+  const may = getDolar("mayorista"), ofi = getDolar("oficial"), tar = getDolar("tarjeta"), mep = getDolar("bolsa"), ccl = getDolar("contadoconliqui");
+  if (may) {
+    let f = `El <b>dólar mayorista</b> opera en ${money(may.venta)}`;
+    const extra = [];
+    if (ofi) extra.push(`oficial minorista ${money(ofi.venta)}`);
+    if (tar) extra.push(`tarjeta ${money(tar.venta)}`);
+    if (extra.length) f += ` (${extra.join(", ")})`;
+    const fin = [];
+    if (mep) fin.push(`MEP ${money(mep.venta)}`);
+    if (ccl) fin.push(`CCL ${money(ccl.venta)}`);
+    if (fin.length) f += `. En los financieros, ${fin.join(" y ")}`;
+    f += ".";
+    if (PANEL.dolarHist && PANEL.dolarHist.varSem != null) {
+      const v = PANEL.dolarHist.varSem;
+      f += ` En la última semana el mayorista ${palabraMov(v)} ${pctAbs(v)}`;
+      if (PANEL.dolarHist.varMes != null) f += ` y en el mes ${pctSigned(PANEL.dolarHist.varMes)}`;
+      f += ".";
+      if (Math.abs(v) < 1) f += " Se observa <b>estabilidad cambiaria</b>.";
+      if (Math.abs(v) >= 2) alertas.push(`Dólar mayorista: ${palabraMov(v)} ${pctAbs(v)} en la semana.`);
+    }
+    partes.push(`<p class="rp-frase">${f}</p>`);
+  }
+
+  // 2) Riesgo país
+  if (PANEL.riesgo) {
+    const r = PANEL.riesgo;
+    let racha = "";
+    if (r.racha >= 2 && r.dir !== 0) racha = `, y viene ${r.dir < 0 ? "bajando" : "subiendo"} hace ${r.racha} jornadas`;
+    let f = `El <b>riesgo país</b> está en <b>${r.valor} pb</b>${racha}.`;
+    if (r.semAnt != null) f += ` Hace una semana estaba en ${r.semAnt} pb`;
+    if (r.mesAnt != null) f += ` y hace un mes en ${r.mesAnt} pb`;
+    f += ".";
+    partes.push(`<p>${f}</p>`);
+    if (r.racha >= 3 && r.dir !== 0) alertas.push(`Riesgo país: ${r.racha} jornadas seguidas en ${r.dir < 0 ? "baja" : "suba"} (hoy ${r.valor} pb).`);
+    else if (r.varSem != null && Math.abs(r.varSem) >= 8) alertas.push(`Riesgo país: ${r.varSem > 0 ? "subió" : "bajó"} ${pctAbs(r.varSem)} en la semana (hoy ${r.valor} pb).`);
+  }
+
+  // 3) REM del BCRA
+  if (PANEL.rem && PANEL.rem.filas) {
+    const fila = (n) => PANEL.rem.filas.find((x) => x.indicador.toLowerCase().includes(n));
+    const inf = fila("inflación (ipc nivel"), tc = fila("tipo de cambio"), saldo = fila("saldo comercial");
+    const bits = [];
+    if (inf && inf.dato) bits.push(`inflación ${inf.dato}`);
+    if (tc && tc.proyeccion) bits.push(/^diciembre/i.test(tc.proyeccion) ? "tipo de cambio a fin de año " + tc.proyeccion.replace(/^Diciembre:\s*/i, "") : "tipo de cambio " + tc.proyeccion);
+    if (saldo && saldo.proyeccion) bits.push(`balanza comercial ${saldo.proyeccion.charAt(0).toLowerCase() + saldo.proyeccion.slice(1)}`);
+    let f = `El último <b>REM del BCRA</b> (${PANEL.rem.mesRem}) proyecta`;
+    f += bits.length ? `: ${bits.join("; ")}.` : " sus principales variables (ver el detalle en la sección REM).";
+    partes.push(`<p>${f}</p>`);
+  }
+
+  // 4) Mercado
+  if (PANEL.mercado && PANEL.mercado.instrumentos) {
+    const insts = PANEL.mercado.instrumentos.filter((i) => i.ok && i.varSemana != null);
+    const movers = insts.slice().sort((a, b) => Math.abs(b.varSemana) - Math.abs(a.varSemana)).slice(0, 2);
+    if (movers.length) {
+      const txt = movers.map((m) => `${limpiarNombre(m.nombre)} ${palabraMov(m.varSemana)} ${pctAbs(m.varSemana)}`).join(", y ");
+      partes.push(`<p>En el <b>mercado</b>, lo más destacado de la semana: ${txt}.</p>`);
+    }
+    insts.forEach((m) => {
+      if (Math.abs(m.varSemana) >= 5) alertas.push(`${limpiarNombre(m.nombre)}: ${palabraMov(m.varSemana)} ${pctAbs(m.varSemana)} en la semana.`);
+      else if (m.varMes != null && Math.abs(m.varMes) >= 12) alertas.push(`${limpiarNombre(m.nombre)}: ${pctSigned(m.varMes)} en el último mes.`);
+    });
+  }
+
+  // 5) EEUU — próximo dato relevante
+  if (PANEL.eeuu && PANEL.eeuu.length) {
+    const ahora = Date.now();
+    const futuros = PANEL.eeuu.filter((e) => e.fecha && Date.parse(e.fecha) >= ahora).sort((a, b) => Date.parse(a.fecha) - Date.parse(b.fecha));
+    if (futuros.length) {
+      const n = futuros[0];
+      const fstr = new Date(n.fecha).toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+      partes.push(`<p>En <b>EEUU</b>, el próximo dato relevante es <b>${n.nombre}</b> (${fstr}).</p>`);
+    }
+  }
+
+  // 6) INDEC
+  partes.push(`<p>El <b>INDEC</b> difunde sus indicadores a las 16 hs. <a class="fuente" href="https://www.indec.gob.ar/indec/web/Calendario-Fecha-0" target="_blank" rel="noreferrer">Ver qué se publica este mes ↗</a></p>`);
+
+  // Cambios a vigilar
+  let alertHtml = "";
+  if (alertas.length) {
+    alertHtml = `<div class="resumen-alertas"><p style="margin:2px 0 4px;"><b>⚠ Cambios a vigilar</b> <span style="color:var(--muted);font-size:12px;">(contra la semana / el mes anterior)</span></p>` +
+      alertas.slice(0, 6).map((a) => `<div class="a-item"><span class="r-tag">Cambio</span><span>${a}</span></div>`).join("") + `</div>`;
+  }
+
+  body.innerHTML = (partes.length ? partes.join("") : `<p style="color:var(--muted);">Leyendo los datos del panel…</p>`) + alertHtml;
+
+  if (statusEl) {
+    const listos = [PANEL.dolares && "dólar", PANEL.riesgo && "riesgo país", PANEL.rem && "REM", PANEL.mercado && "mercado"].filter(Boolean);
+    const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    statusEl.textContent = "Actualizado " + ahora + " hs · " + listos.length + " bloques leídos";
+  }
+}
 
 function fmtFecha(iso) {
   const d = new Date(iso);
@@ -148,6 +415,8 @@ async function cargarTiposCambio() {
     });
     cont.innerHTML = html;
     localStorage.setItem("prevDolares", JSON.stringify(nuevoPrev));
+    PANEL.dolares = data;
+    renderResumen();
     const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
     statusEl.textContent = "● Tipos de cambio verificados en vivo — " + ahora + "hs";
     statusEl.className = "live-status live-ok";
@@ -160,30 +429,56 @@ async function cargarTiposCambio() {
 
 cargarTiposCambio();
 
+function procesarRiesgo(serie) {
+  serie = serie.filter((x) => x && x.fecha && isFinite(x.valor)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!serie.length) return null;
+  const last = serie[serie.length - 1];
+  // Racha: cuántas jornadas seguidas viene en la misma dirección (baja o suba)
+  let dir = 0, racha = 0;
+  for (let i = serie.length - 1; i > 0; i--) {
+    const diff = serie[i].valor - serie[i - 1].valor;
+    if (diff < 0) { if (dir === 0 || dir === -1) { dir = -1; racha++; } else break; }
+    else if (diff > 0) { if (dir === 0 || dir === 1) { dir = 1; racha++; } else break; }
+    else break;
+  }
+  const tMs = Date.parse(last.fecha + "T00:00:00Z");
+  const hace = (dias) => { const o = tMs - dias * 86400000; let e = null; for (const p of serie) { if (Date.parse(p.fecha + "T00:00:00Z") <= o) e = p; } return e || serie[0]; };
+  const sem = hace(7), mes = hace(30);
+  return {
+    valor: Math.round(last.valor), fecha: last.fecha, dir, racha,
+    prev: serie.length > 1 ? serie[serie.length - 2].valor : null,
+    semAnt: Math.round(sem.valor), mesAnt: Math.round(mes.valor),
+    varSem: pct(last.valor, sem.valor), varMes: pct(last.valor, mes.valor),
+  };
+}
+
 async function cargarRiesgoPais() {
   const cont = document.getElementById("riesgo-pais");
   try {
-    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo?t=" + Date.now(), { cache: "no-store" });
+    // Serie histórica completa: sirve para el valor del día, la racha y las comparaciones del resumen.
+    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("bad response");
-    const d = await res.json(); // { fecha: "YYYY-MM-DD", valor: number }
-    const prevRaw = localStorage.getItem("prevRiesgoPais");
-    const prev = prevRaw ? parseFloat(prevRaw) : null;
-    const variacion = prev ? Math.round(((d.valor - prev) / prev) * 1000) / 10 : 0;
+    const serie = await res.json(); // [{ fecha, valor }]
+    const r = procesarRiesgo(serie);
+    if (!r) throw new Error("serie vacía");
+    PANEL.riesgo = r;
+
+    const variacion = r.prev ? Math.round(((r.valor - r.prev) / r.prev) * 1000) / 10 : 0;
     const flat = variacion === 0, positive = variacion > 0;
     const color = flat ? "var(--muted)" : positive ? "var(--neg)" : "var(--pos)"; // para riesgo país, SUBIR es negativo
     const bg = flat ? "transparent" : positive ? "rgba(178,58,58,0.1)" : "rgba(47,125,79,0.1)";
     const arrow = flat ? "–" : positive ? "▲" : "▼";
-    const fechaFmt = new Date(d.fecha + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const fechaFmt = new Date(r.fecha + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
     cont.innerHTML = `
       <div class="card">
         <div class="variacion" style="color:${color};background:${bg}">${arrow} ${Math.abs(variacion)}%</div>
         <div class="label">Riesgo país (EMBI+)</div>
-        <div class="valor">${Math.round(d.valor)} pb</div>
-        <div class="fecha-dato">Dato: ${fechaFmt}</div>
+        <div class="valor">${r.valor} pb</div>
+        <div class="fecha-dato">Dato: ${fechaFmt}${r.racha >= 2 && r.dir !== 0 ? " · " + (r.dir < 0 ? "▼" : "▲") + " " + r.racha + " jornadas" : ""}</div>
         <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">¿Qué es esto? ▾</button>
         <div class="def">Sobretasa que exige el mercado a la deuda argentina sobre bonos del Tesoro de EEUU. A mayor valor, mayor percepción de riesgo de default.<br/><a class="fuente" href="https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo" target="_blank" rel="noreferrer">Ver fuente (ArgentinaDatos) ↗</a></div>
       </div>`;
-    localStorage.setItem("prevRiesgoPais", String(d.valor));
+    renderResumen();
   } catch (e) {
     cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>No se pudo consultar en vivo ahora mismo.</div>";
   }
@@ -263,6 +558,8 @@ async function cargarRemBcra() {
 
     statusEl.textContent = "● Consultado en vivo desde el BCRA — REM " + data.mesRem;
     statusEl.className = "live-status live-ok";
+    PANEL.rem = data;
+    renderResumen();
 
     const filasHtml = data.filas.map((f) => `
       <tr>
@@ -413,6 +710,9 @@ async function cargarCalendarioEEUU() {
   cont.innerHTML = html;
   try { localStorage.setItem("calendarioEEUU_v1", JSON.stringify(store)); } catch (e) { /* nada */ }
 
+  PANEL.eeuu = CAL_EEUU.map((ind) => { const d = store[ind.id] || ind.seed; return { nombre: ind.nombre, fecha: d.fecha, impacto: d.impacto }; });
+  renderResumen();
+
   if (live) {
     const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
     statusEl.textContent = "● Calendario de EEUU consultado en vivo (ForexFactory) — " + ahora + "hs";
@@ -423,6 +723,12 @@ async function cargarCalendarioEEUU() {
   }
 }
 cargarCalendarioEEUU();
+
+// Mercado + historia del dólar para el resumen
+cargarMercado();
+cargarHistoriaDolar();
+// Render de respaldo: arma el resumen con lo que haya llegado, aunque alguna fuente tarde o falle
+setTimeout(renderResumen, 4500);
 </script>
 </body>
 </html>
