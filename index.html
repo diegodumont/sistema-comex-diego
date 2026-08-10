@@ -57,7 +57,7 @@
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Normativa Comex del día</div>
     <div id="normativa-comex"></div>
 
-    <div class="live-status" id="indec-status" style="margin-top:22px;">Consultando calendario del INDEC…</div>
+    <div class="live-status" id="indec-status" style="margin-top:22px;">Calendario del INDEC…</div>
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Calendario INDEC</div>
     <div id="indec-calendario" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:4px 16px;"></div>
 
@@ -201,43 +201,30 @@ async function cargarNormativaComex() {
 }
 cargarNormativaComex();
 
-async function cargarCalendarioIndec() {
+// Calendario INDEC — enlace directo a la fuente oficial en vivo.
+// El PDF semestral del INDEC se desactualiza durante el semestre (el INDEC mueve fechas
+// y solo su sitio web las refleja) y además su tabla en columnas se parsea de forma
+// inestable. Para no arriesgar mostrar una fecha equivocada a clientes o medios, este
+// bloque enlaza siempre a la fuente oficial, que es la única que está al día.
+function cargarCalendarioIndec() {
   const statusEl = document.getElementById("indec-status");
   const cont = document.getElementById("indec-calendario");
-  try {
-    const res = await fetch("/.netlify/functions/calendario-indec?t=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) throw new Error("bad response");
-    const data = await res.json();
-    if (data.error) {
-      if (data.necesitaLinkNuevo) {
-        statusEl.textContent = "● El INDEC aún no publicó el calendario de este período — avisale a Claude el link nuevo";
-        statusEl.className = "live-status live-err";
-        cont.innerHTML = `<div style="padding:16px 4px;color:var(--muted);font-size:13px;">${data.mensaje}</div>`;
-        return;
-      }
-      throw new Error(data.mensaje);
-    }
-    statusEl.textContent = "● Consultado en vivo desde el calendario oficial del INDEC";
-    statusEl.className = "live-status live-ok";
-
-    if (!data.eventos.length) {
-      cont.innerHTML = `<div style="padding:16px 4px;color:var(--muted);font-size:13px;">Sin publicaciones programadas en los próximos 7 días. <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo ↗</a></div>`;
-      return;
-    }
-
-    cont.innerHTML = data.eventos.map((e) => `
-      <div style="display:flex;gap:14px;padding:12px 4px;border-bottom:1px solid var(--line);">
-        <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);width:70px;flex-shrink:0;">${e.fecha}</div>
-        <div style="font-size:14px;color:var(--ink);">
-          ${e.indicadores.map((ind) => `<div style="margin-bottom:4px;">${ind}</div>`).join("")}
-        </div>
-      </div>`).join("") +
-      `<div style="padding:10px 4px;"><a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver calendario completo del semestre ↗</a></div>`;
-  } catch (e) {
-    statusEl.textContent = "● No se pudo consultar el calendario INDEC en vivo (" + (e.message || e) + ")";
-    statusEl.className = "live-status live-err";
-    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;padding:10px 4px;'>Sin datos disponibles ahora mismo.</div>";
-  }
+  const urlIndec = "https://www.indec.gob.ar/indec/web/Calendario-Fecha-0";
+  statusEl.textContent = "● Fuente oficial en vivo — el INDEC actualiza el calendario en su sitio";
+  statusEl.className = "live-status live-ok";
+  cont.innerHTML = `
+    <div style="padding:18px 4px;">
+      <div style="font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:16px;">
+        El calendario de difusión del INDEC se ajusta durante el mes, y solo el sitio oficial refleja siempre la fecha vigente de cada publicación (todas se difunden a las <b>16:00&nbsp;hs</b>). Para no mostrar una fecha desactualizada, este panel te lleva directo a la fuente oficial en vivo, donde ves qué se publica en el mes.
+      </div>
+      <a href="${urlIndec}" target="_blank" rel="noreferrer"
+         style="display:inline-block;background:var(--ink);color:#fff;font-family:'Space Mono',monospace;font-size:13px;letter-spacing:0.03em;text-decoration:none;padding:12px 20px;border-radius:4px;">
+        Ver calendario oficial del INDEC (en vivo) ↗
+      </a>
+      <div style="font-size:11px;color:var(--muted);margin-top:14px;font-family:'Space Mono',monospace;">
+        Fuente: indec.gob.ar · Calendario de difusión
+      </div>
+    </div>`;
 }
 cargarCalendarioIndec();
 
