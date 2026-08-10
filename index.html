@@ -195,8 +195,8 @@ function cardMktHTML(inst) {
       ${badgeVar(inst.varSemana)}
       <div class="label">${inst.nombre}</div>
       <div class="valor">${precioMkt(inst)}</div>
-      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : ("sin dato" + (inst.motivo ? " (" + inst.motivo + ")" : ""))} · ${inst.fuente}</div>
-      <div class="mkt-com">${comentarioMkt(inst)}</div>
+      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : (inst.cargando ? "consultando…" : "sin dato" + (inst.motivo ? " (" + inst.motivo + ")" : ""))} · ${inst.fuente}</div>
+      <div class="mkt-com">${inst.cargando && !inst.ok ? "Cargando cotización…" : comentarioMkt(inst)}</div>
       <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">Ver fuente ▾</button>
       <div class="def"><a class="fuente" href="${inst.fuenteUrl}" target="_blank" rel="noreferrer">${linkTxt} ↗</a></div>
     </div>`;
@@ -250,8 +250,15 @@ function resumirSerieCli(serie) {
 }
 function metaInst(id, extra) { const m = MERCADO_META.find((x) => x.id === id); return Object.assign({}, m, { ok: false, precio: null, fecha: null, varSemana: null, varMes: null }, extra || {}); }
 
+// fetch con límite de tiempo: si una fuente/proxy tarda, corta y no cuelga el panel.
+function fetchTO(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms || 7000);
+  return fetch(url, { cache: "no-store", signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
 async function bitcoinCli() {
-  const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=31&interval=daily", { cache: "no-store" });
+  const r = await fetchTO("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=31&interval=daily", 7000);
   if (!r.ok) throw new Error("cg");
   const d = await r.json();
   const serie = (d.prices || []).map(([ts, p]) => ({ fecha: new Date(ts).toISOString().slice(0, 10), close: p }));
@@ -262,7 +269,7 @@ async function bitcoinCli() {
 async function eurusdCli() {
   const hasta = new Date().toISOString().slice(0, 10);
   const desde = new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10);
-  const r = await fetch("https://api.frankfurter.dev/v1/" + desde + ".." + hasta + "?base=EUR&symbols=USD", { cache: "no-store" });
+  const r = await fetchTO("https://api.frankfurter.dev/v1/" + desde + ".." + hasta + "?base=EUR&symbols=USD", 7000);
   if (!r.ok) throw new Error("frk");
   const d = await r.json();
   const serie = Object.keys(d.rates || {}).sort().map((f) => ({ fecha: f, close: d.rates[f].USD }));
@@ -285,7 +292,7 @@ async function yahooCli(symbol) {
   let ultimoError = null;
   for (const px of PROXIES) {
     try {
-      const r = await fetch(px(target), { cache: "no-store" });
+      const r = await fetchTO(px(target), 7000);
       if (!r.ok) { ultimoError = new Error("HTTP " + r.status); continue; }
       const data = await r.json();
       const res = data && data.chart && data.chart.result && data.chart.result[0];
@@ -325,27 +332,42 @@ async function cargarMercado() {
   const statusEl = document.getElementById("mercado-status");
   const ahora = () => new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-  const tareas = MERCADO_META.map((m) => {
-    if (m.id === "bitcoin") return bitcoinCli();
-    if (m.id === "eurusd") return eurusdCli();
-    return yahooCli(YMAP[m.id]).then((s) => metaInst(m.id, Object.assign({ ok: true }, s)));
-  });
-
-  const settled = await Promise.allSettled(tareas);
-  const instrumentos = settled.map((r, i) => {
-    if (r.status === "fulfilled" && r.value && r.value.precio != null) return r.value;
-    const motivo = r.status === "rejected" ? String(r.reason && r.reason.message || r.reason) : "sin datos";
-    return metaInst(MERCADO_META[i].id, { motivo });
-  });
-
+  // Dibujamos las placas de entrada (como "cargando") y cada una se completa sola.
+  const instrumentos = MERCADO_META.map((m) => metaInst(m.id, { cargando: true }));
   const data = { fecha: new Date().toISOString(), instrumentos, granosBCR: GRANOS_BCR_FALLBACK };
   PANEL.mercado = data;
   pintarMercado(data);
-  renderResumen();
 
-  const okCount = instrumentos.filter((i) => i.ok).length;
-  statusEl.textContent = "● Mercado consultado en vivo — " + okCount + "/" + instrumentos.length + " cotizaciones — " + ahora() + "hs";
-  statusEl.className = "live-status " + (okCount ? "live-ok" : "live-err");
+  let respondidos = 0;
+  const total = MERCADO_META.length;
+  const refrescarEstado = () => {
+    const ok = instrumentos.filter((i) => i.ok).length;
+    if (respondidos < total) {
+      statusEl.textContent = "● Consultando el mercado en vivo… (" + ok + "/" + total + ")";
+      statusEl.className = "live-status";
+    } else {
+      statusEl.textContent = "● Mercado consultado en vivo — " + ok + "/" + total + " cotizaciones — " + ahora() + "hs";
+      statusEl.className = "live-status " + (ok ? "live-ok" : "live-err");
+    }
+  };
+  refrescarEstado();
+
+  const aplicar = (id, obj) => {
+    const idx = instrumentos.findIndex((x) => x.id === id);
+    if (idx >= 0) instrumentos[idx] = obj;
+    respondidos++;
+    pintarMercado(data);
+    renderResumen();
+    refrescarEstado();
+  };
+
+  MERCADO_META.forEach((m) => {
+    const p = m.id === "bitcoin" ? bitcoinCli()
+      : m.id === "eurusd" ? eurusdCli()
+      : yahooCli(YMAP[m.id]).then((s) => metaInst(m.id, Object.assign({ ok: true }, s)));
+    p.then((v) => aplicar(m.id, v && v.precio != null ? v : metaInst(m.id, { motivo: "sin datos" })))
+     .catch((e) => aplicar(m.id, metaInst(m.id, { motivo: String(e && e.message || e) })));
+  });
 }
 
 // ── HISTORIA DEL DÓLAR MAYORISTA (para la lectura de estabilidad del resumen) ──
