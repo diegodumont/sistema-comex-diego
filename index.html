@@ -31,6 +31,19 @@
   .toggle { background: none; border: none; cursor: pointer; color: var(--accent); font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; padding: 0; margin-top: 8px; display: block; }
   a.fuente { color: var(--accent); font-size: 12px; text-decoration: none; }
   .footer-note { margin-top: 30px; font-size: 11px; color: var(--muted); text-align: center; }
+
+  /* Calendario EEUU */
+  .cal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .cal-card { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; }
+  .cal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .cal-fields { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+  .cal-field { min-width: 90px; }
+  .cal-field .k { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .cal-field .v { font-family: 'Space Mono', monospace; font-size: 17px; margin-top: 3px; }
+  .imp { display: inline-block; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .imp-high { background: rgba(178,58,58,0.12); color: var(--neg); }
+  .imp-med { background: rgba(184,121,46,0.14); color: var(--accent); }
+  .imp-low { background: rgba(124,136,145,0.14); color: var(--muted); }
 </style>
 </head>
 <body>
@@ -66,7 +79,16 @@
     <div id="rem-bcra"></div>
   </div>
 
-  <div class="footer-note">Tipos de cambio, Riesgo país y Normativa Comex: consulta en vivo · resto de las secciones: próxima etapa</div>
+  <div class="section">
+    <div class="section-title">Calendario EEUU</div>
+    <div class="live-status" id="cal-eeuu-status">Consultando calendario económico de EEUU…</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 14px;line-height:1.55;">
+      Los 5 indicadores de EEUU con mayor impacto en el mercado. De cada uno: dato <b>anterior</b>, <b>previsión</b> (consenso) y <b>fecha</b> de publicación (hora ART). La previsión y el dato en vivo se toman del calendario de ForexFactory la semana en que se publica cada indicador; cuando el indicador no cae en la semana en curso, se muestra el último dato conocido y la próxima fecha oficial. Tocá "Qué es y cómo mueve al mercado" en cada tarjeta para ver la interpretación.
+    </div>
+    <div class="cal-grid" id="calendario-eeuu"></div>
+  </div>
+
+  <div class="footer-note">Tipos de cambio, Riesgo país y Normativa Comex: consulta en vivo · Calendario EEUU: consenso y fecha en vivo (ForexFactory) la semana de cada publicación · resto de las secciones: próxima etapa</div>
 </div>
 
 <script>
@@ -271,6 +293,134 @@ async function cargarRemBcra() {
   }
 }
 cargarRemBcra();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Calendario EEUU — 5 indicadores clave.
+// Datos "seed" = último dato conocido + próxima fecha oficial (verificados el
+// 10/08/2026). Cuando un indicador cae en la semana en curso, la función
+// /.netlify/functions/calendario-eeuu lo actualiza en vivo desde ForexFactory
+// (anterior, previsión y fecha/hora) y ese valor queda guardado en el navegador.
+// ─────────────────────────────────────────────────────────────────────────────
+const CAL_EEUU = [
+  {
+    id: "fed",
+    nombre: "Tasa de interés FED (FOMC)",
+    fuente: "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+    fuenteNombre: "Reserva Federal",
+    seed: { anterior: "3,50%–3,75%", prevision: "Se define cerca de la reunión", fecha: "2026-09-16T14:00:00-04:00", impacto: "High", origen: "Reserva Federal (decisión 29/07/2026)" },
+    def: "Fija el costo del dinero en EEUU y es el dato de mayor impacto global. <b>Si las tasas suben:</b> las acciones caen (financiarse sale más caro para las empresas) y el dólar sube (mejores rendimientos de los bonos en dólares atraen capitales del mundo). <b>Si las tasas bajan:</b> las acciones suben (financiamiento más barato) y el dólar cae (menor rendimiento en EEUU, los inversores venden dólares para buscar rentabilidad en otras monedas).",
+  },
+  {
+    id: "nfp",
+    nombre: "Nóminas No Agrícolas (NFP)",
+    fuente: "https://www.bls.gov/schedule/news_release/empsit.htm",
+    fuenteNombre: "BLS · Employment Situation",
+    seed: { anterior: "−23 mil (jul 2026)", prevision: "por confirmar", fecha: "2026-09-04T08:30:00-04:00", impacto: "High", origen: "BLS (dato de julio, publicado 07/08/2026)" },
+    def: "Empleo no agrícola creado en el mes; el termómetro del mercado laboral de EEUU. <b>Si el dato es mejor de lo esperado:</b> el dólar sube (un empleo fuerte le permite a la Fed mantener o subir tasas, y tasas altas atraen inversiones al dólar) y las acciones caen (el mercado teme tasas altas por más tiempo, que encarecen el crédito). <b>Si es peor de lo esperado:</b> el dólar cae (expectativa de que la Fed recorte tasas para frenar la pérdida de empleo) y las acciones suben a corto plazo (anticipan esa baja de tasas).",
+  },
+  {
+    id: "cpi",
+    nombre: "IPC · Inflación (CPI m/m)",
+    fuente: "https://www.bls.gov/schedule/news_release/cpi.htm",
+    fuenteNombre: "BLS · CPI",
+    seed: { anterior: "0,3% m/m (jun 2026)", prevision: "0,2% m/m", fecha: "2026-08-12T08:30:00-04:00", impacto: "High", origen: "BLS · dato de referencia" },
+    def: "Índice de Precios al Consumidor: mide la inflación de EEUU. <b>Si la inflación sale más alta de lo esperado:</b> las acciones caen (obliga a la Fed a subir o mantener tasas altas, enfriando el consumo y el crédito) y el dólar sube (tasas proyectadas más altas atraen capitales que buscan mayores rendimientos). <b>Si sale más baja de lo esperado:</b> las acciones suben (le da margen a la Fed para bajar tasas y abaratar el financiamiento) y el dólar cae (la expectativa de menores tasas reduce su rendimiento).",
+  },
+  {
+    id: "gdp",
+    nombre: "PIB · Crecimiento (GDP)",
+    fuente: "https://www.bea.gov/data/gdp/gross-domestic-product",
+    fuenteNombre: "BEA",
+    seed: { anterior: "1,5% t/t anual. (Q2 2026, avance)", prevision: "por confirmar", fecha: "2026-08-26T08:30:00-04:00", impacto: "High", origen: "BEA (avance Q2, publicado 30/07/2026)" },
+    def: "Producto Interno Bruto: mide el crecimiento de la economía de EEUU. <b>Si el crecimiento es mayor de lo esperado:</b> las acciones suben (más crecimiento son más ventas y ganancias para las empresas) y el dólar sube (una economía fuerte genera confianza y demanda de la moneda). <b>Si es menor de lo esperado:</b> las acciones caen (refleja una desaceleración del consumo que golpea las ganancias) y el dólar cae (debilita la macro y alimenta la expectativa de baja de tasas para reactivar).",
+  },
+  {
+    id: "retail",
+    nombre: "Ventas Minoristas (Retail Sales)",
+    fuente: "https://www.census.gov/retail/sales.html",
+    fuenteNombre: "U.S. Census Bureau",
+    seed: { anterior: "0,2% m/m", prevision: "0,1% m/m", fecha: "2026-08-14T08:30:00-04:00", impacto: "Medium", origen: "Census · dato de referencia" },
+    def: "Ventas del comercio minorista: el gasto del consumidor es cerca del 70% del PIB de EEUU. <b>Si las ventas suben por encima de lo previsto:</b> las acciones suben (más compras son ingresos directos para las empresas de consumo masivo) y el dólar sube (un consumo fuerte aleja el riesgo de recesión). <b>Si caen por debajo de lo previsto:</b> las acciones caen (anticipa estancamiento por falta de consumo) y el dólar cae (el mercado proyecta enfriamiento y eventuales recortes de tasas).",
+  },
+];
+
+function fmtFechaEEUU(iso) {
+  const d = new Date(iso);
+  const fecha = d.toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Argentina/Buenos_Aires" });
+  const hora = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  return fecha + " · " + hora + "hs (ART)";
+}
+
+function impLabel(x) {
+  if (x === "High") return ["Alto impacto", "imp-high"];
+  if (x === "Medium") return ["Medio impacto", "imp-med"];
+  if (x === "Low") return ["Bajo impacto", "imp-low"];
+  return ["", "imp-low"];
+}
+
+async function cargarCalendarioEEUU() {
+  const statusEl = document.getElementById("cal-eeuu-status");
+  const cont = document.getElementById("calendario-eeuu");
+
+  let semana = {}, live = false;
+  try {
+    const res = await fetch("/.netlify/functions/calendario-eeuu?t=" + Date.now(), { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.error && data.semana) { semana = data.semana; live = true; }
+    }
+  } catch (e) { /* seguimos con datos seed/guardados */ }
+
+  let store = {};
+  try { store = JSON.parse(localStorage.getItem("calendarioEEUU_v1") || "{}"); } catch (e) { store = {}; }
+
+  let html = "";
+  CAL_EEUU.forEach((ind) => {
+    // Si el feed trae el indicador esta semana, actualizamos y lo guardamos.
+    if (semana[ind.id]) {
+      const s = semana[ind.id];
+      store[ind.id] = {
+        anterior: s.anterior || "—",
+        prevision: s.forecast || "por confirmar",
+        fecha: s.fecha,
+        impacto: s.impacto || ind.seed.impacto,
+        origen: "ForexFactory (en vivo)",
+      };
+    }
+    // Prioridad: dato en vivo/guardado del navegador → seed de referencia.
+    const d = store[ind.id] || Object.assign({}, ind.seed);
+    const [impTxt, impCls] = impLabel(d.impacto);
+
+    html += `
+      <div class="cal-card">
+        <div class="cal-head">
+          <div class="label">${ind.nombre}</div>
+          ${impTxt ? `<span class="imp ${impCls}">${impTxt}</span>` : ""}
+        </div>
+        <div class="cal-fields">
+          <div class="cal-field"><div class="k">Dato anterior</div><div class="v">${d.anterior || "—"}</div></div>
+          <div class="cal-field"><div class="k">Previsión</div><div class="v">${d.prevision || "—"}</div></div>
+        </div>
+        <div class="fecha-dato" style="margin-top:12px;">Se publica: ${fmtFechaEEUU(d.fecha)}</div>
+        <div class="fecha-dato" style="margin-top:2px;">Origen: ${d.origen || "—"}</div>
+        <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">Qué es y cómo mueve al mercado ▾</button>
+        <div class="def">${ind.def}<br/><br/><a class="fuente" href="${ind.fuente}" target="_blank" rel="noreferrer">Fuente oficial (${ind.fuenteNombre}) ↗</a> &nbsp;·&nbsp; <a class="fuente" href="https://www.forexfactory.com/calendar" target="_blank" rel="noreferrer">Calendario en vivo (ForexFactory) ↗</a></div>
+      </div>`;
+  });
+
+  cont.innerHTML = html;
+  try { localStorage.setItem("calendarioEEUU_v1", JSON.stringify(store)); } catch (e) { /* nada */ }
+
+  if (live) {
+    const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    statusEl.textContent = "● Calendario de EEUU consultado en vivo (ForexFactory) — " + ahora + "hs";
+    statusEl.className = "live-status live-ok";
+  } else {
+    statusEl.textContent = "● Mostrando el último dato conocido de cada indicador (no se pudo consultar el feed en vivo en este momento)";
+    statusEl.className = "live-status live-err";
+  }
+}
+cargarCalendarioEEUU();
 </script>
 </body>
 </html>
