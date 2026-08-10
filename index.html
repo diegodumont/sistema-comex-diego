@@ -44,6 +44,8 @@
   .imp-high { background: rgba(178,58,58,0.12); color: var(--neg); }
   .imp-med { background: rgba(184,121,46,0.14); color: var(--accent); }
   .imp-low { background: rgba(124,136,145,0.14); color: var(--muted); }
+  .cal-proxima { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .cal-proxima .cal-fecha { color: var(--ink); font-weight: 700; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -83,7 +85,7 @@
     <div class="section-title">Calendario EEUU</div>
     <div class="live-status" id="cal-eeuu-status">Consultando calendario económico de EEUU…</div>
     <div style="font-size:12px;color:var(--muted);margin:6px 0 14px;line-height:1.55;">
-      Los 5 indicadores de EEUU con mayor impacto en el mercado. De cada uno: dato <b>anterior</b>, <b>previsión</b> (consenso) y <b>fecha</b> de publicación (hora ART). La previsión y el dato en vivo se toman del calendario de ForexFactory la semana en que se publica cada indicador; cuando el indicador no cae en la semana en curso, se muestra el último dato conocido y la próxima fecha oficial. Tocá "Qué es y cómo mueve al mercado" en cada tarjeta para ver la interpretación.
+      Los 5 indicadores de EEUU con mayor impacto en el mercado. De cada uno: dato <b>anterior</b>, <b>previsión</b> (consenso) y <b>fecha</b> de publicación (en hora de Argentina — ART = hora argentina). La previsión y el dato en vivo se toman del calendario de ForexFactory la semana en que se publica cada indicador; cuando el indicador no cae en la semana en curso, se muestra el último dato conocido y la próxima fecha oficial. Tocá "Qué es y cómo mueve al mercado" en cada tarjeta para ver la interpretación.
     </div>
     <div class="cal-grid" id="calendario-eeuu"></div>
   </div>
@@ -105,7 +107,7 @@ document.getElementById("fecha-hoy").textContent = "Actualizado — " + new Date
 function fmtFecha(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Argentina/Buenos_Aires" }) + " " +
-    d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }) + "hs (ART)";
+    d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }) + "hs (hora de Argentina)";
 }
 
 function cardHTML(cfg, d, prevVenta) {
@@ -347,8 +349,8 @@ const CAL_EEUU = [
 function fmtFechaEEUU(iso) {
   const d = new Date(iso);
   const fecha = d.toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Argentina/Buenos_Aires" });
-  const hora = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-  return fecha + " · " + hora + "hs (ART)";
+  const hora = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
+  return `<b class="cal-fecha">${fecha}</b> · ${hora} h (hora de Argentina — ART)`;
 }
 
 function impLabel(x) {
@@ -401,7 +403,7 @@ async function cargarCalendarioEEUU() {
           <div class="cal-field"><div class="k">Dato anterior</div><div class="v">${d.anterior || "—"}</div></div>
           <div class="cal-field"><div class="k">Previsión</div><div class="v">${d.prevision || "—"}</div></div>
         </div>
-        <div class="fecha-dato" style="margin-top:12px;">Se publica: ${fmtFechaEEUU(d.fecha)}</div>
+        <div class="cal-proxima" style="margin-top:12px;">Próximo dato — se publica: ${fmtFechaEEUU(d.fecha)}</div>
         <div class="fecha-dato" style="margin-top:2px;">Origen: ${d.origen || "—"}</div>
         <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">Qué es y cómo mueve al mercado ▾</button>
         <div class="def">${ind.def}<br/><br/><a class="fuente" href="${ind.fuente}" target="_blank" rel="noreferrer">Fuente oficial (${ind.fuenteNombre}) ↗</a> &nbsp;·&nbsp; <a class="fuente" href="https://www.forexfactory.com/calendar" target="_blank" rel="noreferrer">Calendario en vivo (ForexFactory) ↗</a></div>
