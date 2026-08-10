@@ -228,14 +228,14 @@ function granosCardHTML(granos, bcr) {
 // Metadatos de cada instrumento (espejo de la función), para poder armar la sección
 // desde el navegador si el servidor no respondiera.
 const MERCADO_META = [
-  { id: "brent", nombre: "Petróleo Brent", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Stooq · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/brent-oil" },
-  { id: "wti", nombre: "Petróleo WTI", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Stooq · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/crude-oil" },
-  { id: "oro", nombre: "Oro", grupo: "metal", unidad: "US$/onza", decimales: 2, fuente: "Stooq · XAU/USD (spot)", fuenteUrl: "https://es.investing.com/currencies/xau-usd" },
+  { id: "brent", nombre: "Petróleo Brent", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/brent-oil" },
+  { id: "wti", nombre: "Petróleo WTI", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://es.investing.com/commodities/crude-oil" },
+  { id: "oro", nombre: "Oro", grupo: "metal", unidad: "US$/onza", decimales: 2, fuente: "Yahoo Finance · oro COMEX (futuro)", fuenteUrl: "https://es.investing.com/currencies/xau-usd" },
   { id: "bitcoin", nombre: "Bitcoin", grupo: "cripto", unidad: "US$", decimales: 0, fuente: "CoinGecko", fuenteUrl: "https://www.coingecko.com/es/monedas/bitcoin" },
   { id: "eurusd", nombre: "Euro / Dólar", grupo: "divisa", unidad: "US$ por €", decimales: 4, fuente: "BCE · referencia diaria (Frankfurter)", fuenteUrl: "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html" },
-  { id: "soja", nombre: "Soja · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Stooq · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-soybeans" },
-  { id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Stooq · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-corn" },
-  { id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Stooq · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-wheat" },
+  { id: "soja", nombre: "Soja · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-soybeans" },
+  { id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-corn" },
+  { id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://es.investing.com/commodities/us-wheat" },
 ];
 const GRANOS_BCR_FALLBACK = { local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra", fob: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales-0", disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible" };
 
