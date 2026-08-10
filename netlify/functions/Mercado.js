@@ -61,13 +61,24 @@ function resumirSerie(serie) {
   };
 }
  
+// fetch con timeout: ninguna fuente lenta puede colgar la función más allá de `ms`.
+// (Netlify corta las funciones a los ~10s; con esto la función siempre responde antes.)
+async function fetchTO(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { headers: UA.headers, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 async function fetchText(url) {
-  const r = await fetch(url, UA);
+  const r = await fetchTO(url, 3500);
   if (!r.ok) throw new Error("HTTP " + r.status);
   return await r.text();
 }
 async function fetchJson(url) {
-  const r = await fetch(url, UA);
+  const r = await fetchTO(url, 3500);
   if (!r.ok) throw new Error("HTTP " + r.status);
   return await r.json();
 }
@@ -186,7 +197,32 @@ const INSTRUMENTOS = [
   },
 ];
  
+const GRANOS_BCR = {
+  local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra",
+  fob: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales-0",
+  disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible",
+};
+ 
 exports.handler = async function () {
+  // Blindaje total: pase lo que pase, la función responde 200 con JSON válido
+  // (nunca un 500/timeout que el panel leería como "bad response").
+  try {
+    return await construir();
+  } catch (e) {
+    const instrumentos = INSTRUMENTOS.map((inst) => ({
+      id: inst.id, nombre: inst.nombre, grupo: inst.grupo, unidad: inst.unidad,
+      decimales: inst.decimales, fuente: inst.fuente, fuenteUrl: inst.fuenteUrl,
+      ok: false, precio: null, fecha: null, varSemana: null, varMes: null,
+    }));
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      body: JSON.stringify({ fecha: new Date().toISOString(), instrumentos, granosBCR: GRANOS_BCR, aviso: String(e && e.message || e) }),
+    };
+  }
+};
+ 
+async function construir() {
   const resultados = await Promise.allSettled(INSTRUMENTOS.map((i) => i.obtener()));
  
   const instrumentos = INSTRUMENTOS.map((inst, idx) => {
@@ -215,14 +251,8 @@ exports.handler = async function () {
     body: JSON.stringify({
       fecha: new Date().toISOString(),
       instrumentos,
-      // Fuente oficial argentina para granos (la referencia local que pide el Word):
-      granosBCR: {
-        local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra",
-        fob: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales-0",
-        disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible",
-      },
+      granosBCR: GRANOS_BCR,
     }),
   };
-};
+}
  
-Descargado index.html Mostrar en el Explorado
