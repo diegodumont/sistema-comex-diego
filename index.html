@@ -195,8 +195,8 @@ function cardMktHTML(inst) {
       ${badgeVar(inst.varSemana)}
       <div class="label">${inst.nombre}</div>
       <div class="valor">${precioMkt(inst)}</div>
-      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : (inst.cargando ? "consultando…" : "sin dato" + (inst.motivo ? " (" + inst.motivo + ")" : ""))} · ${inst.fuente}</div>
-      <div class="mkt-com">${inst.cargando && !inst.ok ? "Cargando cotización…" : comentarioMkt(inst)}</div>
+      <div class="fecha-dato">${inst.unidad} · ${inst.ok ? ("cierre " + fmtFechaCorta(inst.fecha)) : (inst.cargando ? "consultando…" : inst.linkOnly ? "ver en la fuente ↓" : "sin dato" + (inst.motivo ? " (" + inst.motivo + ")" : ""))} · ${inst.fuente}</div>
+      <div class="mkt-com">${inst.ok ? comentarioMkt(inst) : inst.cargando ? "Cargando cotización…" : inst.linkOnly ? "Sin fuente gratuita automática para este indicador — mirá el precio en la fuente (botón de abajo)." : comentarioMkt(inst)}</div>
       <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">Ver fuente ▾</button>
       <div class="def"><a class="fuente" href="${inst.fuenteUrl}" target="_blank" rel="noreferrer">${linkTxt} ↗</a></div>
     </div>`;
@@ -255,6 +255,31 @@ function fetchTO(url, ms) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms || 7000);
   return fetch(url, { cache: "no-store", signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
+// Historial local: guardamos un valor por día en el navegador para poder calcular
+// la variación semanal/mensual de fuentes que solo dan el precio del momento (oro).
+function histLocal(id, fecha, precio) {
+  let store = {};
+  try { store = JSON.parse(localStorage.getItem("mktHist_" + id) || "{}"); } catch (e) { store = {}; }
+  store[fecha] = precio;
+  const fechas = Object.keys(store).sort();
+  while (fechas.length > 45) { delete store[fechas.shift()]; }
+  try { localStorage.setItem("mktHist_" + id, JSON.stringify(store)); } catch (e) { /* nada */ }
+  const serie = Object.keys(store).sort().map((f) => ({ fecha: f, close: store[f] }));
+  return resumirSerieCli(serie) || { varSemana: null, varMes: null, baseSemana: null, baseMes: null };
+}
+
+// Oro — fuente directa sin clave (verificada). Da el precio del momento; la
+// variación semanal/mensual se va calculando con el historial local del navegador.
+async function goldApiCli() {
+  const r = await fetchTO("https://api.gold-api.com/price/XAU", 7000);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const d = await r.json();
+  if (d.price == null || !isFinite(d.price)) throw new Error("sin precio");
+  const hoy = new Date().toISOString().slice(0, 10);
+  const s = histLocal("oro", hoy, d.price);
+  return metaInst("oro", Object.assign({ ok: true, precio: d.price, fecha: hoy }, s));
 }
 
 async function bitcoinCli() {
@@ -348,11 +373,12 @@ async function cargarMercado() {
   const total = MERCADO_META.length;
   const refrescarEstado = () => {
     const ok = instrumentos.filter((i) => i.ok).length;
+    const link = instrumentos.filter((i) => i.linkOnly).length;
     if (respondidos < total) {
-      statusEl.textContent = "● Consultando el mercado en vivo… (" + ok + "/" + total + ")";
+      statusEl.textContent = "● Consultando el mercado en vivo… (" + ok + " listas)";
       statusEl.className = "live-status";
     } else {
-      statusEl.textContent = "● Mercado consultado en vivo — " + ok + "/" + total + " cotizaciones — " + ahora() + "hs";
+      statusEl.textContent = "● En vivo: " + ok + " cotizaciones (oro, bitcoin, euro)" + (link ? " · petróleo y granos: ver en la fuente" : "") + " — " + ahora() + "hs";
       statusEl.className = "live-status " + (ok ? "live-ok" : "live-err");
     }
   };
@@ -368,10 +394,14 @@ async function cargarMercado() {
   };
 
   MERCADO_META.forEach((m) => {
-    const p = m.id === "bitcoin" ? bitcoinCli()
-      : m.id === "eurusd" ? eurusdCli()
-      : yahooCli(YMAP[m.id]).then((s) => metaInst(m.id, Object.assign({ ok: true }, s)));
-    p.then((v) => aplicar(m.id, v && v.precio != null ? v : metaInst(m.id, { motivo: "sin datos" })))
+    let p;
+    if (m.id === "bitcoin") p = bitcoinCli();
+    else if (m.id === "eurusd") p = eurusdCli();
+    else if (m.id === "oro") p = goldApiCli();
+    // Petróleo y granos: no hay fuente gratis automática (todas bloquean). Estado
+    // limpio con enlace directo a la fuente, hasta conectar una fuente con clave.
+    else p = Promise.resolve(metaInst(m.id, { linkOnly: true }));
+    p.then((v) => aplicar(m.id, v && v.precio != null ? v : metaInst(m.id, { linkOnly: true })))
      .catch((e) => aplicar(m.id, metaInst(m.id, { motivo: String(e && e.message || e) })));
   });
 }
