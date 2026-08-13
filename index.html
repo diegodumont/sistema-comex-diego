@@ -575,20 +575,44 @@ function parseFobSagyp(posts) {
   return map;
 }
 
+// Baja el texto de un puente (devuelve string, resolviendo el envoltorio de allorigins/get).
+async function bajarProxy(px, target) {
+  const r = await fetchTO(px.url(target), 9000);
+  if (!r.ok) return null;
+  if (px.envuelto) { const w = await r.json(); return w && typeof w.contents === "string" ? w.contents : null; }
+  return await r.text();
+}
+
 async function cargarGranosAR() {
   const nombres = { soja: "Soja", maiz: "Maíz", trigo: "Trigo", girasol: "Girasol" };
   let pizarra = {}, fecPiz = null, fob = {}, fecFob = null;
-  try { const html = await proxyText("https://www.cac.bcr.com.ar/es/precios-de-pizarra"); const p = parsePizarra(html); pizarra = p.precios; fecPiz = p.fecha; } catch (e) { /* pizarra opcional */ }
-  try {
-    for (let d = 0; d < 7; d++) {
-      const dt = new Date(Date.now() - d * 86400000);
-      const fq = String(dt.getDate()).padStart(2, "0") + "/" + String(dt.getMonth() + 1).padStart(2, "0") + "/" + dt.getFullYear();
-      const txt = await proxyText("https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/ws/ssma/precios_fob.php?Fecha=" + fq);
-      let json = null; try { json = JSON.parse(txt); } catch (e) { /* nada */ }
-      const posts = json && (Array.isArray(json) ? json : json.posts);
-      if (Array.isArray(posts) && posts.length) { const m = parseFobSagyp(posts); if (Object.keys(m).length) { fob = m; fecFob = fq; break; } }
+
+  // Pizarra Cámara Rosario: probamos cada puente hasta que el parseo traiga datos.
+  for (const px of PROXIES) {
+    try {
+      const html = await bajarProxy(px, "https://www.cac.bcr.com.ar/es/precios-de-pizarra");
+      if (!html) continue;
+      const p = parsePizarra(html);
+      if (Object.keys(p.precios).length) { pizarra = p.precios; fecPiz = p.fecha; break; }
+    } catch (e) { /* siguiente puente */ }
+  }
+
+  // FOB oficial SAGyP: por cada fecha (hasta 7 días atrás), probamos cada puente.
+  for (let d = 0; d < 7 && !Object.keys(fob).length; d++) {
+    const dt = new Date(Date.now() - d * 86400000);
+    const fq = String(dt.getDate()).padStart(2, "0") + "/" + String(dt.getMonth() + 1).padStart(2, "0") + "/" + dt.getFullYear();
+    const target = "https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/ws/ssma/precios_fob.php?Fecha=" + fq;
+    for (const px of PROXIES) {
+      try {
+        const txt = await bajarProxy(px, target);
+        if (!txt) continue;
+        let json = null; try { json = JSON.parse(txt); } catch (e) { continue; }
+        const posts = json && (Array.isArray(json) ? json : json.posts);
+        if (Array.isArray(posts) && posts.length) { const m = parseFobSagyp(posts); if (Object.keys(m).length) { fob = m; fecFob = fq; break; } }
+      } catch (e) { /* siguiente puente */ }
     }
-  } catch (e) { /* fob opcional */ }
+  }
+
   const items = Object.keys(nombres).map((k) => ({ nombre: nombres[k], pizarra: pizarra[k] != null ? pizarra[k] : null, fob: fob[k] != null ? fob[k] : null }));
   PANEL.granosAR = { fecha: fecPiz || fecFob || null, fechaFob: fecFob, items };
   if (PANEL.mercado) pintarMercado(PANEL.mercado);
