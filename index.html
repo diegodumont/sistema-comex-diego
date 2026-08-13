@@ -120,6 +120,13 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Tasas de interés — Argentina</div>
+    <div class="live-status" id="tasas-status">Consultando tasas…</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 12px;line-height:1.55;">Cuánto rinde tu plata y cuánto cuesta el dinero. Tocá "¿Qué es esto?" en cada tasa para ver qué significa. <b>TNA</b> = Tasa Nominal Anual.</div>
+    <div class="grid" id="tasas"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Argentina — Normativa y datos oficiales</div>
     <div class="live-status" id="normativa-status">Consultando Boletín Oficial…</div>
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Normativa Comex del día</div>
@@ -843,6 +850,74 @@ async function cargarRiesgoPais() {
   }
 }
 cargarRiesgoPais();
+
+// ── Tasas de interés (plazo fijo, en vivo) ────────────────────────────────────
+async function cargarTasas() {
+  const statusEl = document.getElementById("tasas-status");
+  const cont = document.getElementById("tasas");
+  const TOG = "this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'";
+  const FUENTE = '<a class="fuente" href="https://www.argentinadatos.com/docs/operations/get-finanzas-tasas-plazo-fijo" target="_blank" rel="noreferrer">Fuente: BCRA (vía ArgentinaDatos) ↗</a>';
+  try {
+    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/tasas/plazoFijo?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad");
+    const data = await res.json();
+    const clientes = data.map((b) => b.tnaClientes).filter((x) => x && x > 0);
+    if (!clientes.length) throw new Error("sin datos");
+    const prom = clientes.reduce((a, b) => a + b, 0) / clientes.length * 100;
+    const conNombre = data.filter((b) => b.tnaClientes > 0).sort((a, b) => b.tnaClientes - a.tnaClientes);
+    const mejor = conNombre[0];
+    const mejorTna = mejor.tnaClientes * 100;
+    const anuales = data.map((b) => { const t = (b.tasas || []).find((x) => x.plazoMinDias <= 365 && x.plazoMaxDias >= 365); return t && t.tna > 0 ? t.tna : null; }).filter((x) => x != null);
+    const promAnual = anuales.length ? anuales.reduce((a, b) => a + b, 0) / anuales.length * 100 : null;
+    const fmt = (n) => n.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
+
+    // Tendencia del promedio respecto de la última vez
+    const prevRaw = localStorage.getItem("prevTasaProm");
+    const prev = prevRaw ? parseFloat(prevRaw) : null;
+    localStorage.setItem("prevTasaProm", String(prom));
+    let badge = "";
+    if (prev != null) {
+      const dif = Math.round((prom - prev) * 10) / 10;
+      if (dif !== 0) { const up = dif > 0; badge = `<div class="variacion" style="color:${up ? "var(--pos)" : "var(--neg)"};background:${up ? "rgba(47,125,79,0.1)" : "rgba(178,58,58,0.1)"}" title="Cambio respecto a la última vez que abriste el panel">${up ? "▲" : "▼"} ${Math.abs(dif)} pp</div>`; }
+    }
+
+    let html = `
+      <div class="card">
+        ${badge}
+        <div class="label">Plazo fijo — promedio bancos</div>
+        <div class="valor">${fmt(prom)}</div>
+        <div class="fecha-dato">TNA · plazo fijo tradicional 30 días</div>
+        <button class="toggle" onclick="${TOG}">¿Qué es esto? ▾</button>
+        <div class="def">TNA (Tasa Nominal Anual) promedio que pagan los bancos por un plazo fijo tradicional a 30 días para clientes. Es <b>cuánto rinde</b> tu plata inmovilizada un mes; conviene compararla con la inflación para ver si le ganás.<br/>${FUENTE}</div>
+      </div>
+      <div class="card">
+        <div class="label">Plazo fijo — mejor tasa</div>
+        <div class="valor">${fmt(mejorTna)}</div>
+        <div class="fecha-dato">${mejor.entidad}</div>
+        <button class="toggle" onclick="${TOG}">¿Qué es esto? ▾</button>
+        <div class="def">La TNA más alta que ofrece hoy un banco para plazo fijo de clientes a 30 días. Te dice dónde conviene colocar la plata.<br/>${FUENTE}</div>
+      </div>`;
+    if (promAnual != null) {
+      html += `
+      <div class="card">
+        <div class="label">Plazo fijo a 1 año — promedio</div>
+        <div class="valor">${fmt(promAnual)}</div>
+        <div class="fecha-dato">TNA · plazo fijo a 365 días</div>
+        <button class="toggle" onclick="${TOG}">¿Qué es esto? ▾</button>
+        <div class="def">TNA promedio para un plazo fijo a 365 días. Sirve para estimar el rendimiento si mantenés la colocación un año.<br/>${FUENTE}</div>
+      </div>`;
+    }
+    cont.innerHTML = html;
+    const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    statusEl.textContent = "● Tasas de plazo fijo en vivo — " + ahora + "hs";
+    statusEl.className = "live-status live-ok";
+  } catch (e) {
+    statusEl.textContent = "● No se pudieron consultar las tasas ahora mismo";
+    statusEl.className = "live-status live-err";
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;'>Sin datos de tasas disponibles ahora mismo.</div>";
+  }
+}
+cargarTasas();
 
 async function cargarNormativaComex() {
   const statusEl = document.getElementById("normativa-status");
