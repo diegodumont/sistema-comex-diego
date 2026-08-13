@@ -226,7 +226,7 @@ function granosArHTML() {
         </tr></thead>
         <tbody>${filas}</tbody>
       </table>
-      <div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5;">Pizarra Cámara Arbitral de Rosario en $/t${ar.fecha ? " (al " + ar.fecha + ")" : ""} · FOB spot oficial de la SAGyP en US$/t, mes de embarque más cercano${ar.fechaFob ? " (al " + ar.fechaFob + ")" : ""}. <a class="fuente" href="https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/fob_oficiales/" target="_blank" rel="noreferrer">Ver FOB SAGyP ↗</a></div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5;">Pizarra Cámara Arbitral de Rosario en $/t${ar.fecha ? " (al " + ar.fecha + ")" : ""} · FOB spot oficial de la SAGyP en US$/t, mes de embarque más cercano${ar.fechaFob ? " (al " + ar.fechaFob + ")" : ""}. <a class="fuente" href="https://www.magyp.gob.ar/mercadosagropecuarios/precios.php" target="_blank" rel="noreferrer">Ver FOB SAGyP ↗</a></div>
     </div>`;
 }
 
@@ -251,7 +251,7 @@ function granosCardHTML(granos, bcr) {
 
       <div class="granos-links" style="margin-top:12px;">
         <a href="${bcr.local || "#"}" target="_blank" rel="noreferrer">Pizarra Cámara Rosario ($/t) ↗</a>
-        <a href="${bcr.fob || "#"}" target="_blank" rel="noreferrer">FOB/FAS Argentina (US$/t) ↗</a>
+        <a href="${bcr.fob || "#"}" target="_blank" rel="noreferrer">FOB oficial SAGyP (US$/t) ↗</a>
       </div>
     </div>`;
 }
@@ -277,7 +277,7 @@ const MERCADO_META = [
   { id: "maiz", nombre: "Maíz · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://finance.yahoo.com/quote/ZC=F" },
   { id: "trigo", nombre: "Trigo · Chicago (CBOT)", grupo: "grano", unidad: "¢US/bushel", decimales: 2, fuente: "Yahoo Finance · CBOT (referencia internacional)", fuenteUrl: "https://finance.yahoo.com/quote/ZW=F" },
 ];
-const GRANOS_BCR_FALLBACK = { local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra", fob: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales-0", disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible" };
+const GRANOS_BCR_FALLBACK = { local: "https://www.cac.bcr.com.ar/es/precios-de-pizarra", fob: "https://www.magyp.gob.ar/mercadosagropecuarios/precios.php", disponible: "https://www.bcr.com.ar/es/mercados/mercado-de-granos/cotizaciones/cotizaciones-locales/precios-del-mercado-disponible" };
 
 function resumirSerieCli(serie) {
   serie = serie.filter((p) => isFinite(p.close)).sort((a, b) => a.fecha.localeCompare(b.fecha));
