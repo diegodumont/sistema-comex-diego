@@ -115,6 +115,9 @@
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Calendario INDEC</div>
     <div id="indec-calendario" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:4px 16px;"></div>
 
+    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:22px 0 10px;">Inflación Ciudad de Buenos Aires (IPCBA)</div>
+    <div id="ipcba"></div>
+
     <div class="live-status" id="rem-status" style="margin-top:22px;">Consultando REM del BCRA…</div>
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">REM BCRA (datos del mes anterior)</div>
     <div id="rem-bcra"></div>
@@ -841,6 +844,43 @@ function cargarCalendarioIndec() {
     </div>`;
 }
 cargarCalendarioIndec();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inflación Ciudad de Buenos Aires (IPCBA) — Dirección General de Estadística y
+// Censos de la Ciudad. Muestra el último dato publicado (mensual, acumulado del
+// año e interanual) y la próxima publicación. Se difunde antes que el IPC
+// nacional del INDEC, por eso suele anticiparlo. Actualizar cada mes con el
+// nuevo informe (fuente enlazada abajo).
+// ─────────────────────────────────────────────────────────────────────────────
+const IPCBA = {
+  mes: "Julio de 2026",
+  mensual: "2,9%",
+  acumuladoAnio: "19,4%",
+  interanual: "33,2%",
+  publicado: "7 de agosto de 2026",
+  proxima: "primeros días de septiembre de 2026 (dato de agosto)",
+  fuente: "https://www.estadisticaciudad.gob.ar/eyc/publicaciones/ipcba-indice-de-precios-al-consumidor-julio-de-2026/",
+  def: "El <b>IPCBA</b> mide la inflación en la Ciudad de Buenos Aires (lo elabora la Dirección General de Estadística y Censos porteña). Se difunde <b>antes</b> que el IPC nacional del INDEC, así que suele <b>anticipar</b> la tendencia de la inflación del país: es una señal temprana de cómo puede venir el dato nacional.",
+};
+
+function cargarIpcba() {
+  const cont = document.getElementById("ipcba");
+  const d = IPCBA;
+  cont.innerHTML = `
+    <div class="card">
+      <div class="label">Último dato — ${d.mes} · publicado el ${d.publicado}</div>
+      <div class="cal-fields" style="margin-top:12px;">
+        <div class="cal-field"><div class="k">Mensual</div><div class="v">${d.mensual}</div></div>
+        <div class="cal-field"><div class="k">Acumulado 2026</div><div class="v">${d.acumuladoAnio}</div></div>
+        <div class="cal-field"><div class="k">Interanual</div><div class="v">${d.interanual}</div></div>
+      </div>
+      <div class="cal-proxima" style="margin-top:14px;">Próxima publicación: <b class="cal-fecha">${d.proxima}</b></div>
+      <div class="fecha-dato" style="margin-top:6px;">Fuente: <a class="fuente" href="${d.fuente}" target="_blank" rel="noreferrer">DGEyC · Estadística Ciudad de Buenos Aires ↗</a></div>
+      <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">¿Qué es esto? ▾</button>
+      <div class="def">${d.def}<br/><br/><a class="fuente" href="${d.fuente}" target="_blank" rel="noreferrer">Ver informe oficial (DGEyC Ciudad de Buenos Aires) ↗</a></div>
+    </div>`;
+}
+cargarIpcba();
 
 async function cargarRemBcra() {
   const statusEl = document.getElementById("rem-status");
