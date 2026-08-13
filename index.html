@@ -132,6 +132,9 @@
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:22px 0 10px;">Inflación Ciudad de Buenos Aires (IPCBA)</div>
     <div id="ipcba"></div>
 
+    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:22px 0 10px;">Ventas minoristas Pyme (CAME)</div>
+    <div id="came"></div>
+
     <div class="live-status" id="rem-status" style="margin-top:22px;">Consultando REM del BCRA…</div>
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">REM BCRA (datos del mes anterior)</div>
     <div id="rem-bcra"></div>
@@ -151,6 +154,12 @@
     <div class="news">
       <div class="news-head" id="noticias-head">Selección con foco en <b>comercio exterior, aduana y puertos, deuda y licitaciones, acuerdos y relaciones bilaterales, guerra comercial y geopolítica, energía y precios</b>. Cada nota lleva su fuente y su enlace. Se actualiza cada semana.</div>
       <div class="news-body" id="noticias-semana"></div>
+    </div>
+
+    <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:15px;margin:18px 0 8px;">Últimas — titulares en vivo</div>
+    <div class="news">
+      <div class="news-head" style="font-size:11px;">Titulares recientes filtrados por tus temas (comex, dólar/deuda, guerra comercial), vía Google Noticias. Se actualizan solos en cada visita.</div>
+      <div class="news-body" id="ultimas" style="max-height:360px;"></div>
     </div>
   </div>
 
@@ -741,6 +750,28 @@ async function cargarTiposCambio() {
       html += cardHTML(cfg, d, prev[cfg.casa]);
       nuevoPrev[cfg.casa] = d.venta;
     });
+    // Brecha cambiaria: mayorista vs CCL
+    const _may = data.find((x) => x.casa === "mayorista"), _ccl = data.find((x) => x.casa === "contadoconliqui");
+    if (_may && _ccl && _may.venta) {
+      const brecha = Math.round(((_ccl.venta - _may.venta) / _may.venta) * 1000) / 10;
+      const prevB = prev.__brecha != null ? prev.__brecha : null;
+      const dif = prevB != null ? Math.round((brecha - prevB) * 10) / 10 : 0; // en puntos porcentuales
+      const flat = dif === 0, up = dif > 0;
+      const color = flat ? "var(--muted)" : up ? "var(--neg)" : "var(--pos)"; // brecha que sube = presión (rojo)
+      const bg = flat ? "transparent" : up ? "rgba(178,58,58,0.1)" : "rgba(47,125,79,0.1)";
+      const arrow = flat ? "–" : up ? "▲" : "▼";
+      html += `
+    <div class="card">
+      <div class="variacion" style="color:${color};background:${bg}" title="Cambio respecto a la última vez que abriste el panel">${arrow} ${Math.abs(dif)} pp</div>
+      <div class="label">Brecha cambiaria (mayorista/CCL)</div>
+      <div class="valor">${brecha.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</div>
+      <div class="fecha-dato">CCL $${_ccl.venta.toLocaleString("es-AR")} vs mayorista $${_may.venta.toLocaleString("es-AR")}</div>
+      <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">¿Qué es esto? ▾</button>
+      <div class="def">La <b>brecha cambiaria</b> es la diferencia porcentual entre el dólar financiero <b>CCL</b> (Contado con Liquidación) y el <b>dólar mayorista</b> oficial. Mide la tensión cambiaria: si la brecha se <b>amplía</b>, hay más presión sobre el dólar; si se <b>achica</b>, más calma. Se calcula (CCL − mayorista) ÷ mayorista.<br/><a class="fuente" href="https://dolarapi.com/v1/dolares" target="_blank" rel="noreferrer">Fuente: DolarAPI ↗</a></div>
+    </div>`;
+      nuevoPrev.__brecha = brecha;
+      PANEL.brecha = { valor: brecha, dif };
+    }
     cont.innerHTML = html;
     localStorage.setItem("prevDolares", JSON.stringify(nuevoPrev));
     PANEL.dolares = data;
@@ -913,6 +944,42 @@ function cargarIpcba() {
 cargarIpcba();
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Ventas minoristas Pyme (CAME) — Confederación Argentina de la Mediana Empresa.
+// Último dato publicado (mensual, acumulado del año e interanual). Se actualiza
+// cada mes con el nuevo informe.
+// ─────────────────────────────────────────────────────────────────────────────
+const CAME = {
+  mes: "Julio de 2026",
+  mensual: "−2,1%",
+  acumuladoAnio: "−2,7%",
+  interanual: "−3,8%",
+  publicado: "9 de agosto de 2026",
+  proxima: "primeros días de septiembre de 2026 (dato de agosto)",
+  fuente: "https://www.redcame.org.ar/novedades",
+  def: "Índice de <b>Ventas Minoristas Pyme</b> que elabora la CAME (Confederación Argentina de la Mediana Empresa). Mide, mes a mes, cómo evoluciona el consumo en los comercios pyme de todo el país: es un termómetro directo de la actividad y el bolsillo. Un valor negativo indica caída de ventas frente al período comparado.",
+};
+
+function cargarCame() {
+  const cont = document.getElementById("came");
+  if (!cont) return;
+  const d = CAME;
+  cont.innerHTML = `
+    <div class="card">
+      <div class="label">Último dato — ${d.mes} · publicado el ${d.publicado}</div>
+      <div class="cal-fields" style="margin-top:12px;">
+        <div class="cal-field"><div class="k">Mensual</div><div class="v">${d.mensual}</div></div>
+        <div class="cal-field"><div class="k">Acumulado 2026</div><div class="v">${d.acumuladoAnio}</div></div>
+        <div class="cal-field"><div class="k">Interanual</div><div class="v">${d.interanual}</div></div>
+      </div>
+      <div class="cal-proxima" style="margin-top:14px;">Próxima publicación: <b class="cal-fecha">${d.proxima}</b></div>
+      <div class="fecha-dato" style="margin-top:6px;">Fuente: <a class="fuente" href="${d.fuente}" target="_blank" rel="noreferrer">CAME · Índice de Ventas Minoristas Pyme ↗</a></div>
+      <button class="toggle" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">¿Qué es esto? ▾</button>
+      <div class="def">${d.def}<br/><br/><a class="fuente" href="${d.fuente}" target="_blank" rel="noreferrer">Ver informe oficial (CAME) ↗</a></div>
+    </div>`;
+}
+cargarCame();
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Noticias de la semana (Economía y Comex) + Congreso. Selección curada; se
 // actualiza cada semana. Cada ítem: título, resumen (por qué importa), fuente y
 // enlace. Para actualizar, editar estas dos listas.
@@ -957,6 +1024,50 @@ function renderNoticias() {
   if (cong) cong.innerHTML = CONGRESO.map(noticiaItemHTML).join("");
 }
 renderNoticias();
+
+// ── "Últimas" — titulares en vivo (Google Noticias RSS vía proxy) ─────────────
+const ULTIMAS_QUERIES = [
+  '("comercio exterior" OR aduana OR aranceles OR importaciones OR exportaciones OR Mercosur OR puertos) Argentina',
+  '(dólar OR deuda OR inflación OR "riesgo país" OR BCRA OR licitación) Argentina',
+  '"guerra comercial" (China OR "Estados Unidos" OR aranceles OR "tierras raras")',
+];
+async function cargarUltimas() {
+  const cont = document.getElementById("ultimas");
+  if (!cont) return;
+  const all = [];
+  for (const q of ULTIMAS_QUERIES) {
+    try {
+      const url = "https://news.google.com/rss/search?q=" + encodeURIComponent(q) + "&hl=es-419&gl=AR&ceid=AR:es-419";
+      const xml = await proxyText(url);
+      const doc = new DOMParser().parseFromString(xml, "text/xml");
+      Array.prototype.slice.call(doc.querySelectorAll("item"), 0, 8).forEach((it) => {
+        const g = (sel) => { const el = it.querySelector(sel); return el ? el.textContent.trim() : ""; };
+        all.push({ title: g("title"), link: g("link"), pub: g("pubDate"), src: g("source") });
+      });
+    } catch (e) { /* seguimos con las demás consultas */ }
+  }
+  all.sort((a, b) => (Date.parse(b.pub) || 0) - (Date.parse(a.pub) || 0));
+  const seen = {}, uniq = [];
+  for (const n of all) {
+    if (!n.title) continue;
+    const k = n.title.toLowerCase().slice(0, 55);
+    if (seen[k]) continue;
+    seen[k] = 1; uniq.push(n);
+    if (uniq.length >= 14) break;
+  }
+  if (!uniq.length) {
+    cont.innerHTML = "<div style='color:var(--muted);font-size:13px;padding:8px 0;'>No se pudieron cargar los titulares en vivo ahora mismo — probá recargar.</div>";
+    return;
+  }
+  cont.innerHTML = uniq.map((n) => {
+    const t = n.title.replace(/\s+-\s+[^-]+$/, "");
+    const m = n.title.match(/-\s+([^-]+)$/);
+    const src = n.src || (m ? m[1].trim() : "");
+    const fecha = n.pub ? new Date(n.pub).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+    return `<div class="news-item"><a class="n-t" href="${n.link}" target="_blank" rel="noreferrer" style="font-size:14px;">${t} ↗</a><div class="n-f">${src}${src && fecha ? " · " : ""}${fecha}</div></div>`;
+  }).join("");
+}
+cargarUltimas();
 
 async function cargarRemBcra() {
   const statusEl = document.getElementById("rem-status");
