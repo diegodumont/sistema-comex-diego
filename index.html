@@ -64,6 +64,20 @@
   .r-up { color: var(--pos); font-weight: 700; } .r-down { color: var(--neg); font-weight: 700; }
   .r-tag { font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 3px; background: rgba(184,121,46,0.14); color: var(--accent); white-space: nowrap; }
 
+  /* Noticias de la semana / Congreso */
+  .news { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 0; overflow: hidden; }
+  .news-head { padding: 10px 16px; border-bottom: 1px solid var(--line); background: #FBFAF6; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .news-body { max-height: 440px; overflow-y: auto; padding: 4px 16px 12px; scrollbar-width: thin; }
+  .news-body::-webkit-scrollbar { width: 8px; }
+  .news-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  .news-grupo { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin: 16px 0 4px; }
+  .news-item { padding: 9px 0; border-top: 1px solid var(--line); }
+  .news-item:first-of-type { border-top: none; }
+  .news-item a.n-t { font-family: 'Source Serif 4', Georgia, serif; font-weight: 700; font-size: 15px; color: var(--ink); text-decoration: none; line-height: 1.3; }
+  .news-item a.n-t:hover { color: var(--accent); }
+  .news-item .n-r { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-top: 3px; }
+  .news-item .n-f { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; margin-top: 3px; }
+
   /* Mercado */
   .mkt-com { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 9px; margin-top: 10px; }
   .mkt-var { display: flex; gap: 14px; margin-top: 8px; font-family: 'Space Mono', monospace; font-size: 12px; }
@@ -106,7 +120,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Noticias Argentina</div>
+    <div class="section-title">Argentina — Normativa y datos oficiales</div>
     <div class="live-status" id="normativa-status">Consultando Boletín Oficial…</div>
     <div class="subtitulo" style="font-family:'Source Serif 4',serif;font-weight:700;font-size:16px;margin:8px 0 10px;">Normativa Comex del día</div>
     <div id="normativa-comex"></div>
@@ -130,6 +144,22 @@
       Petróleo (Brent y WTI), oro, bitcoin y euro-dólar en vivo, con su fuente y su fecha, y un comentario automático de cómo vienen en la <b>última semana</b> y el <b>último mes</b>. En granos, los precios argentinos (pizarra Cámara Rosario en $/t y FOB spot en US$/t) de soja, maíz, trigo y girasol, más la referencia internacional de Chicago.
     </div>
     <div class="grid" id="mercado"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Noticias de la semana — Economía y Comex</div>
+    <div class="news">
+      <div class="news-head" id="noticias-head">Selección con foco en <b>comercio exterior, aduana y puertos, deuda y licitaciones, acuerdos y relaciones bilaterales, guerra comercial y geopolítica, energía y precios</b>. Cada nota lleva su fuente y su enlace. Se actualiza cada semana.</div>
+      <div class="news-body" id="noticias-semana"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">En qué está el Congreso Argentino</div>
+    <div class="news">
+      <div class="news-head">Proyectos y leyes en trámite que impactan en la economía, el comercio exterior y la logística. Cada uno con su fuente y enlace.</div>
+      <div class="news-body" id="congreso-arg"></div>
+    </div>
   </div>
 
   <div class="section">
@@ -881,6 +911,52 @@ function cargarIpcba() {
     </div>`;
 }
 cargarIpcba();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Noticias de la semana (Economía y Comex) + Congreso. Selección curada; se
+// actualiza cada semana. Cada ítem: título, resumen (por qué importa), fuente y
+// enlace. Para actualizar, editar estas dos listas.
+// ─────────────────────────────────────────────────────────────────────────────
+const NOTICIAS_SEMANA = [
+  { grupo: "Argentina — economía y comercio exterior", items: [
+    { t: "Se renovó el swap con China por 5 años (~US$19.000 M)", f: "Ámbito Financiero", u: "https://www.ambito.com/economia/el-bcra-renovo-el-swap-china-y-amplio-su-vigencia-cinco-anos-n6307402", r: "El BCRA renovó el swap con China y lo extendió a cinco años: respaldo de peso para las reservas en la antesala electoral." },
+    { t: "Paro de prácticos: caos en los puertos y luego acuerdo", f: "La Nación", u: "https://www.lanacion.com.ar/economia/el-paro-de-practicos-genera-un-caos-en-el-comercio-exterior-de-la-argentina-nid03082026/", r: "El paro de prácticos paralizó más de 150 buques y frenó el comercio exterior; el Gobierno cerró un acuerdo y normalizó la actividad." },
+    { t: "Deuda en pesos: el Tesoro renovó el 100% de los vencimientos", f: "Ámbito Financiero", u: "https://www.ambito.com/finanzas/deuda-pesos-economia-logro-renovar-todos-los-vencimientos-y-evito-profundizar-la-tension-liquidez-n6310137", r: "El Tesoro cubrió todos los vencimientos y sumó US$50 M con el Bonar 2029, sin inyectar pesos al mercado." },
+    { t: "eCommerce: la CACE informó +248% de facturación interanual", f: "CACE", u: "https://cace.org.ar/prensa/el-ecommerce-aumento-un-248-su-facturacion-interanual-en-la-primera-mitad-del-ano/", r: "El comercio electrónico creció con fuerza en el primer semestre pese a la caída del consumo; presiona sobre importaciones y logística." },
+    { t: "La carne en alza: empuja la inflación y cae el consumo", f: "La Mañana de Neuquén", u: "https://masp.lmneuquen.com/ganaderia/precio-la-carne-que-subio-casi-70-y-cuanto-mas-podria-aumentar-2026-n1228582", r: "Fuertes subas de la carne en 2026 que impactan en la inflación de alimentos y el consumo interno." },
+    { t: "Acuerdo automotor Argentina–Ecuador: aranceles al 10%", f: "Argentina.gob.ar", u: "https://www.argentina.gob.ar/noticias/argentina-y-ecuador-firman-un-nuevo-acuerdo-automotriz-para-reducir-aranceles-e-impulsar", r: "Nuevo acuerdo bilateral que reduce aranceles para reactivar las exportaciones automotrices argentinas." },
+  ] },
+  { grupo: "Mundo — geopolítica y guerra comercial", items: [
+    { t: "Brasil retiró su embajador de Argentina", f: "Infobae", u: "https://www.infobae.com/politica/2026/08/04/crisis-sin-precedentes-brasil-retira-a-su-embajador-de-la-argentina-y-rebaja-al-minimo-su-relacion-diplomatica/", r: "Brasil rebajó al mínimo la relación diplomática con Argentina: tensión regional con impacto potencial sobre el Mercosur." },
+    { t: "Se agrava la crisis Brasil–EEUU (visa a su embajadora)", f: "MDZ", u: "https://www.mdzol.com/politica/crisis-diplomatica-la-region-que-argentina-y-estados-unidos-le-dan-la-espalda-brasil-n1579854", r: "EEUU negó la visa a la embajadora brasileña; Argentina y Washington se distancian de Brasilia." },
+    { t: "EEUU vs. China en Vaca Muerta: advertencia por Huawei", f: "Infobae", u: "https://www.infobae.com/politica/2026/08/06/estados-unidos-advirtio-a-una-distribuidora-de-energia-de-neuquen-por-un-contrato-con-huawei/", r: "EEUU advirtió a una distribuidora de Neuquén por un contrato con Huawei y presiona para sacar tecnología china de Vaca Muerta." },
+    { t: "Guerra comercial: EEUU grava el polisilicio y pacta tierras raras", f: "Ámbito Financiero", u: "https://www.ambito.com/economia/eeuu-aplicara-un-arancel-del-15-los-productos-polisilicio-frenar-el-avance-china-n6307719", r: "Arancel del 15% a productos con polisilicio (paneles solares) para frenar a China, mientras negocian acceso a tierras raras." },
+    { t: "Canadá negocia con EEUU para evitar aranceles del 50%", f: "La Jornada", u: "https://www.jornada.com.mx/noticia/2026/08/07/economia/canada-negocia-concesiones-comerciales-con-eu-para-evitar-nuevos-aranceles", r: "Termómetro de la política arancelaria de Washington: Canadá ofrece concesiones para esquivar una suba del 50%." },
+    { t: "Medio Oriente: guerra EEUU–Irán y crisis en Gaza", f: "CNN en Español", u: "https://cnnespanol.cnn.com/2026/08/02/mundo/live-news/guerra-ee-uu-iran-medio-oriente-2-trax", r: "La tensión en Medio Oriente sigue pesando sobre el precio del petróleo y las rutas comerciales." },
+  ] },
+];
+
+const CONGRESO = [
+  { t: "Media sanción a la Ley de Inviolabilidad de la Propiedad Privada", f: "Chequeado (explicador)", u: "https://chequeado.com/el-explicador/claves-del-proyecto-de-ley-sobre-inviolabilidad-de-la-propiedad-privada-que-impulsa-el-gobierno-de-milei/", r: "El Senado le dio media sanción con cambios (se retiró el capítulo de Manejo del Fuego). Claves del proyecto." },
+  { t: "El Gobierno busca modificar la Ley de Cabotaje", f: "ArgenPorts", u: "https://argenports.com/nota/cabotaje-el-gobierno-impulsa-una-reforma-para-transformar-el-mapa-logistico-argentino/", r: "Tras el conflicto portuario, impulsa desregular el cabotaje y el practicaje: cambia el mapa logístico marítimo." },
+  { t: "Reforma de la Ley General de Vinos", f: "Knett Stream", u: "https://knettstream.com.ar/el-gobierno-prepara-una-reforma-que-cambiaria-la-definicion-legal-del-vino/", r: "El Gobierno prepara una reforma que cambiaría la definición legal del vino." },
+  { t: "Ola de desregulación (farmacias, cabotaje, corretaje, agro…)", f: "Parlamentario", u: "https://www.parlamentario.com/2026/07/18/el-gobierno-impulsa-una-profunda-ola-de-desregulacion-que-alcanza-a-farmacias-cabotaje-corretaje-mercados-financieros-agro-y-cultura/", r: "Paquete amplio de desregulación que alcanza a varios sectores, con impacto en comercio y servicios." },
+];
+
+function noticiaItemHTML(n) {
+  return `<div class="news-item">
+    <a class="n-t" href="${n.u}" target="_blank" rel="noreferrer">${n.t} ↗</a>
+    <div class="n-r">${n.r}</div>
+    <div class="n-f">Fuente: ${n.f}</div>
+  </div>`;
+}
+function renderNoticias() {
+  const cont = document.getElementById("noticias-semana");
+  if (cont) cont.innerHTML = NOTICIAS_SEMANA.map((g) => `<div class="news-grupo">${g.grupo}</div>` + g.items.map(noticiaItemHTML).join("")).join("");
+  const cong = document.getElementById("congreso-arg");
+  if (cong) cong.innerHTML = CONGRESO.map(noticiaItemHTML).join("");
+}
+renderNoticias();
 
 async function cargarRemBcra() {
   const statusEl = document.getElementById("rem-status");
