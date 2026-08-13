@@ -124,7 +124,7 @@
     <div class="section-title">Mercado</div>
     <div class="live-status" id="mercado-status">Consultando cotizaciones del mercado…</div>
     <div style="font-size:12px;color:var(--muted);margin:6px 0 14px;line-height:1.55;">
-      Petróleo (Brent y WTI), oro, bitcoin y euro-dólar en vivo, con su fuente y su fecha, y un comentario automático de cómo vienen en la <b>última semana</b> y el <b>último mes</b>. Los granos incluyen la referencia internacional de Chicago y los enlaces oficiales de la Bolsa de Comercio de Rosario para el dato local argentino.
+      Petróleo (Brent y WTI), oro, bitcoin y euro-dólar en vivo, con su fuente y su fecha, y un comentario automático de cómo vienen en la <b>última semana</b> y el <b>último mes</b>. En granos, los precios argentinos (pizarra Cámara Rosario en $/t y FOB spot en US$/t) de soja, maíz, trigo y girasol, más la referencia internacional de Chicago.
     </div>
     <div class="grid" id="mercado"></div>
   </div>
@@ -155,7 +155,7 @@ document.getElementById("fecha-hoy").textContent = "Actualizado — " + new Date
 // ═════════════════════════════════════════════════════════════════════════════
 // ESTADO COMPARTIDO DEL PANEL + HELPERS (para el recuadro RESUMEN y para MERCADO)
 // ═════════════════════════════════════════════════════════════════════════════
-const PANEL = { dolares: null, dolarHist: null, riesgo: null, rem: null, mercado: null, eeuu: null };
+const PANEL = { dolares: null, dolarHist: null, riesgo: null, rem: null, mercado: null, eeuu: null, granosAR: null };
 
 function pct(a, b) { return (b == null || b === 0 || a == null) ? null : Math.round(((a - b) / b) * 1000) / 10; }
 function pctAbs(v) { return v == null ? "—" : Math.abs(v).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "%"; }
@@ -201,8 +201,38 @@ function cardMktHTML(inst) {
       <div class="def"><a class="fuente" href="${inst.fuenteUrl}" target="_blank" rel="noreferrer">${linkTxt} ↗</a></div>
     </div>`;
 }
+// Tabla de precios Argentina (pizarra $/t Cámara Rosario + FOB spot US$/t SAGyP).
+function granosArHTML() {
+  const ar = PANEL.granosAR;
+  if (!ar || !ar.items || !ar.items.length) {
+    return `<div style="font-size:12px;color:var(--muted);margin:2px 0 6px;">Precios Argentina (soja, maíz, trigo, girasol): consultando las fuentes oficiales…</div>`;
+  }
+  const th = "text-align:left;padding:6px 8px;font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--ink);";
+  const td = "padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px;";
+  const tdn = td + "font-family:'Space Mono',monospace;";
+  const filas = ar.items.map((x) => `
+      <tr>
+        <td style="${td}">${x.nombre}</td>
+        <td style="${tdn}">${x.pizarra != null ? "$ " + Number(x.pizarra).toLocaleString("es-AR") : "—"}</td>
+        <td style="${tdn}">${x.fob != null ? "US$ " + Number(x.fob).toLocaleString("es-AR") : "—"}</td>
+      </tr>`).join("");
+  return `
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          <th style="${th}">Grano</th>
+          <th style="${th}">Pizarra $/t (Rosario)</th>
+          <th style="${th}">FOB spot US$/t (SAGyP)</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5;">Pizarra Cámara Arbitral de Rosario en $/t${ar.fecha ? " (al " + ar.fecha + ")" : ""} · FOB spot oficial de la SAGyP en US$/t, mes de embarque más cercano${ar.fechaFob ? " (al " + ar.fechaFob + ")" : ""}. <a class="fuente" href="https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/fob_oficiales/" target="_blank" rel="noreferrer">Ver FOB SAGyP ↗</a></div>
+    </div>`;
+}
+
 function granosCardHTML(granos, bcr) {
-  const minis = granos.map((g) => `
+  const conDato = granos.filter((g) => g.ok && g.precio != null);
+  const minis = conDato.map((g) => `
       <div class="g">
         <div class="n">${limpiarNombre(g.nombre)}</div>
         <div class="p">${precioMkt(g)}</div>
@@ -211,22 +241,32 @@ function granosCardHTML(granos, bcr) {
   return `
     <div class="card granos-card">
       <div class="label">Granos</div>
+
       <div style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 8px;line-height:1.5;">
-        <b>Referencia internacional — Chicago (CBOT).</b> Son futuros del mercado de Chicago; <b>NO</b> son el FOB Argentina ni la pizarra local. Sirven para ver la tendencia global del grano.
+        <b>Precios Argentina</b> — pizarra Cámara Arbitral de Rosario (en $/t) y FOB spot de la SAGyP (en US$/t). Es la referencia local que importa para comercio exterior.
       </div>
-      <div class="granos-mini">${minis || "<span style='color:var(--muted)'>Sin datos de Chicago ahora mismo.</span>"}</div>
-      <div style="font-size:12.5px;color:var(--ink-soft);margin:4px 0 6px;line-height:1.5;">
-        <b>Dato local argentino</b> (pizarra Cámara Rosario en $/t y FOB Argentina Spot en US$/t). Se consulta directo en la fuente oficial de la Bolsa de Comercio de Rosario:
-      </div>
-      <div class="granos-links">
+      ${granosArHTML()}
+
+      ${conDato.length ? `<div style="font-size:11px;color:var(--muted);margin:14px 0 4px;">Referencia internacional Chicago (CBOT) — no es el FOB Argentina:</div><div class="granos-mini">${minis}</div>` : ""}
+
+      <div class="granos-links" style="margin-top:12px;">
         <a href="${bcr.local || "#"}" target="_blank" rel="noreferrer">Pizarra Cámara Rosario ($/t) ↗</a>
-        <a href="${bcr.disponible || "#"}" target="_blank" rel="noreferrer">Mercado disponible Rosario ↗</a>
         <a href="${bcr.fob || "#"}" target="_blank" rel="noreferrer">FOB/FAS Argentina (US$/t) ↗</a>
       </div>
     </div>`;
 }
 // Metadatos de cada instrumento (espejo de la función), para poder armar la sección
 // desde el navegador si el servidor no respondiera.
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║  CLAVE DE ALPHA VANTAGE (petróleo Brent/WTI, maíz y trigo)                 ║
+// ║  Pegá tu clave gratuita entre las comillas de abajo (reemplazá el texto). ║
+// ║  La sacás gratis en: https://www.alphavantage.co/support/#api-key         ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+const AV_KEY = "PEGA_TU_CLAVE_AQUI";
+
+const AV_FUNC = { brent: "BRENT", wti: "WTI" };
+const AV_TIENE_CLAVE = AV_KEY && AV_KEY !== "PEGA_TU_CLAVE_AQUI";
+
 const MERCADO_META = [
   { id: "brent", nombre: "Petróleo Brent", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://finance.yahoo.com/quote/BZ=F" },
   { id: "wti", nombre: "Petróleo WTI", grupo: "petroleo", unidad: "US$/barril", decimales: 2, fuente: "Yahoo Finance · futuro front-month", fuenteUrl: "https://finance.yahoo.com/quote/CL=F" },
@@ -280,6 +320,32 @@ async function goldApiCli() {
   const hoy = new Date().toISOString().slice(0, 10);
   const s = histLocal("oro", hoy, d.price);
   return metaInst("oro", Object.assign({ ok: true, precio: d.price, fecha: hoy }, s));
+}
+
+// Alpha Vantage — petróleo (Brent/WTI), maíz y trigo, con historial diario.
+// Guardamos la respuesta del día en el navegador (cache) para no gastar el
+// límite gratuito (se consulta 1 vez por día por indicador).
+async function alphaVantageCli(id, func) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const ckey = "avcache_" + id + "_" + hoy;
+  let raw = null;
+  try { const c = localStorage.getItem(ckey); if (c) raw = JSON.parse(c); } catch (e) { /* nada */ }
+  if (!raw) {
+    const r = await fetchTO("https://www.alphavantage.co/query?function=" + func + "&interval=daily&apikey=" + encodeURIComponent(AV_KEY), 9000);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    raw = await r.json();
+    try {
+      Object.keys(localStorage).forEach((k) => { if (k.indexOf("avcache_" + id + "_") === 0 && k !== ckey) localStorage.removeItem(k); });
+      localStorage.setItem(ckey, JSON.stringify(raw));
+    } catch (e) { /* nada */ }
+  }
+  if (raw.Information || raw.Note || raw["Error Message"]) throw new Error(String(raw.Information || raw.Note || raw["Error Message"]).slice(0, 50));
+  const arr = raw.data;
+  if (!Array.isArray(arr) || !arr.length) throw new Error("sin datos");
+  const serie = arr.map((x) => ({ fecha: x.date, close: parseFloat(x.value) })).filter((p) => isFinite(p.close));
+  const s = resumirSerieCli(serie);
+  if (!s) throw new Error("serie vacía");
+  return metaInst(id, Object.assign({ ok: true }, s));
 }
 
 async function bitcoinCli() {
@@ -378,7 +444,7 @@ async function cargarMercado() {
       statusEl.textContent = "● Consultando el mercado en vivo… (" + ok + " listas)";
       statusEl.className = "live-status";
     } else {
-      statusEl.textContent = "● En vivo: " + ok + " cotizaciones (oro, bitcoin, euro)" + (link ? " · petróleo y granos: ver en la fuente" : "") + " — " + ahora() + "hs";
+      statusEl.textContent = "● Mercado en vivo — " + ok + " cotizaciones automáticas" + (link ? " · " + link + " con enlace a la fuente" : "") + " — " + ahora() + "hs";
       statusEl.className = "live-status " + (ok ? "live-ok" : "live-err");
     }
   };
@@ -397,13 +463,87 @@ async function cargarMercado() {
     let p;
     if (m.id === "bitcoin") p = bitcoinCli();
     else if (m.id === "eurusd") p = eurusdCli();
-    else if (m.id === "oro") p = goldApiCli();
-    // Petróleo y granos: no hay fuente gratis automática (todas bloquean). Estado
-    // limpio con enlace directo a la fuente, hasta conectar una fuente con clave.
-    else p = Promise.resolve(metaInst(m.id, { linkOnly: true }));
-    p.then((v) => aplicar(m.id, v && v.precio != null ? v : metaInst(m.id, { linkOnly: true })))
+    else p = yahooCli(YMAP[m.id]).then((s) => metaInst(m.id, Object.assign({ ok: true }, s)));
+    p.then((v) => aplicar(m.id, v && v.precio != null ? v : metaInst(m.id, { motivo: "sin datos" })))
      .catch((e) => aplicar(m.id, metaInst(m.id, { motivo: String(e && e.message || e) })));
   });
+}
+
+// ── PRECIOS ARGENTINA (pizarra $/t Cámara Rosario + FOB spot US$/t) ────────────
+// Se leen a través del mismo puente CORS. La API de FOB de la SAGyP bloquea todo
+// acceso automático (firewall), así que el FOB se toma del CSV oficial de la
+// Bolsa de Cereales (mismo concepto: FOB de exportación, mes más cercano = spot).
+async function proxyText(target) {
+  let err = null;
+  for (const px of PROXIES) {
+    try {
+      const r = await fetchTO(px.url(target), 8000);
+      if (!r.ok) { err = new Error("HTTP " + r.status); continue; }
+      if (px.envuelto) { const w = await r.json(); if (w && typeof w.contents === "string") return w.contents; err = new Error("sin contents"); continue; }
+      return await r.text();
+    } catch (e) { err = e; }
+  }
+  throw err || new Error("proxy sin respuesta");
+}
+
+function parsePizarra(html) {
+  const precios = {};
+  let fecha = null;
+  const mf = html.match(/Precios Pizarra del d[ií]a\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if (mf) fecha = mf[1];
+  ["soja", "maiz", "trigo", "girasol"].forEach((k) => {
+    const re = new RegExp("board-" + k + "[\\s\\S]{0,500}?\\$\\s*([\\d.]+),\\d{2}", "i");
+    const m = html.match(re);
+    if (m) { const v = parseFloat(m[1].replace(/\./g, "")); if (isFinite(v)) precios[k] = v; }
+  });
+  return { fecha, precios };
+}
+
+// FOB oficial de la SAGyP: cada registro trae 'posicion' (NCM) y 'precio' (US$/t) por
+// rango de meses de embarque. Mapeamos por NCM y tomamos el mes más cercano (spot).
+//   Trigo 1001 · Maíz 1005 · Soja (poroto) 1201 · Girasol (semilla) 1206
+function parseFobSagyp(posts) {
+  // exact = posición SIM del grado estándar "a granel"; pref = NCM general (respaldo).
+  //   Soja poroto 1201.90 · Maíz 1005.90 · Trigo pan 1001.99 · Girasol semilla 1206.00.90
+  const defs = [
+    { key: "soja", exact: "12019000190", pref: "1201" },
+    { key: "maiz", exact: "10059010190", pref: "1005" },
+    { key: "trigo", exact: "10019900110", pref: "10019900" },
+    { key: "girasol", exact: "12060090910", pref: "1206" },
+  ];
+  const map = {};
+  const cercano = (recs) => {
+    recs = recs.filter((p) => isFinite(parseFloat(p.precio)));
+    if (!recs.length) return null;
+    recs.sort((a, b) => ((a["añoDesde"] || 0) * 12 + (a.mesDesde || 0)) - ((b["añoDesde"] || 0) * 12 + (b.mesDesde || 0)));
+    return parseFloat(recs[0].precio);
+  };
+  defs.forEach((d) => {
+    let v = cercano(posts.filter((p) => String(p.posicion || "").indexOf(d.exact) === 0));
+    if (v == null) v = cercano(posts.filter((p) => String(p.posicion || "").indexOf(d.pref) === 0));
+    if (v != null) map[d.key] = v;
+  });
+  return map;
+}
+
+async function cargarGranosAR() {
+  const nombres = { soja: "Soja", maiz: "Maíz", trigo: "Trigo", girasol: "Girasol" };
+  let pizarra = {}, fecPiz = null, fob = {}, fecFob = null;
+  try { const html = await proxyText("https://www.cac.bcr.com.ar/es/precios-de-pizarra"); const p = parsePizarra(html); pizarra = p.precios; fecPiz = p.fecha; } catch (e) { /* pizarra opcional */ }
+  try {
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(Date.now() - d * 86400000);
+      const fq = String(dt.getDate()).padStart(2, "0") + "/" + String(dt.getMonth() + 1).padStart(2, "0") + "/" + dt.getFullYear();
+      const txt = await proxyText("https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/ws/ssma/precios_fob.php?Fecha=" + fq);
+      let json = null; try { json = JSON.parse(txt); } catch (e) { /* nada */ }
+      const posts = json && (Array.isArray(json) ? json : json.posts);
+      if (Array.isArray(posts) && posts.length) { const m = parseFobSagyp(posts); if (Object.keys(m).length) { fob = m; fecFob = fq; break; } }
+    }
+  } catch (e) { /* fob opcional */ }
+  const items = Object.keys(nombres).map((k) => ({ nombre: nombres[k], pizarra: pizarra[k] != null ? pizarra[k] : null, fob: fob[k] != null ? fob[k] : null }));
+  PANEL.granosAR = { fecha: fecPiz || fecFob || null, fechaFob: fecFob, items };
+  if (PANEL.mercado) pintarMercado(PANEL.mercado);
+  renderResumen();
 }
 
 // ── HISTORIA DEL DÓLAR MAYORISTA (para la lectura de estabilidad del resumen) ──
@@ -881,6 +1021,7 @@ cargarCalendarioEEUU();
 
 // Mercado + historia del dólar para el resumen
 cargarMercado();
+cargarGranosAR();
 cargarHistoriaDolar();
 // Render de respaldo: arma el resumen con lo que haya llegado, aunque alguna fuente tarde o falle
 setTimeout(renderResumen, 4500);
