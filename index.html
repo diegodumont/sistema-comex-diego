@@ -541,7 +541,7 @@ function parsePizarra(html) {
   const mf = html.match(/Precios Pizarra del d[ií]a\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (mf) fecha = mf[1];
   ["soja", "maiz", "trigo", "girasol"].forEach((k) => {
-    const re = new RegExp("board-" + k + "[\\s\\S]{0,500}?\\$\\s*([\\d.]+),\\d{2}", "i");
+    const re = new RegExp("board-" + k + "[\\s\\S]{0,1600}?\\$\\s*([\\d.]+),\\d{2}", "i");
     const m = html.match(re);
     if (m) { const v = parseFloat(m[1].replace(/\./g, "")); if (isFinite(v)) precios[k] = v; }
   });
@@ -587,14 +587,22 @@ async function cargarGranosAR() {
   const nombres = { soja: "Soja", maiz: "Maíz", trigo: "Trigo", girasol: "Girasol" };
   let pizarra = {}, fecPiz = null, fob = {}, fecFob = null;
 
+  // Para las fuentes oficiales argentinas probamos primero allorigins (que responde
+  // bien para estos sitios) y dejamos codetabs al final (suele estar saturado porque
+  // lo usa el petróleo/Chicago).
+  const PROXIES_AR = [PROXIES[1], PROXIES[2], PROXIES[0], PROXIES[3]].filter(Boolean);
+
   // Pizarra Cámara Rosario: probamos cada puente hasta que el parseo traiga datos.
-  for (const px of PROXIES) {
-    try {
-      const html = await bajarProxy(px, "https://www.cac.bcr.com.ar/es/precios-de-pizarra");
-      if (!html) continue;
-      const p = parsePizarra(html);
-      if (Object.keys(p.precios).length) { pizarra = p.precios; fecPiz = p.fecha; break; }
-    } catch (e) { /* siguiente puente */ }
+  // Con dos rondas por si algún puente está caído momentáneamente.
+  for (let intento = 0; intento < 2 && !Object.keys(pizarra).length; intento++) {
+    for (const px of PROXIES_AR) {
+      try {
+        const html = await bajarProxy(px, "https://www.cac.bcr.com.ar/es/precios-de-pizarra");
+        if (!html) continue;
+        const p = parsePizarra(html);
+        if (Object.keys(p.precios).length) { pizarra = p.precios; fecPiz = p.fecha; break; }
+      } catch (e) { /* siguiente puente */ }
+    }
   }
 
   // FOB oficial SAGyP: por cada fecha (hasta 7 días atrás), probamos cada puente.
@@ -602,7 +610,7 @@ async function cargarGranosAR() {
     const dt = new Date(Date.now() - d * 86400000);
     const fq = String(dt.getDate()).padStart(2, "0") + "/" + String(dt.getMonth() + 1).padStart(2, "0") + "/" + dt.getFullYear();
     const target = "https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/ws/ssma/precios_fob.php?Fecha=" + fq;
-    for (const px of PROXIES) {
+    for (const px of PROXIES_AR) {
       try {
         const txt = await bajarProxy(px, target);
         if (!txt) continue;
