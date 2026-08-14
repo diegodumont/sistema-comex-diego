@@ -1188,8 +1188,9 @@ async function cargarCongreso() {
   cont.innerHTML = items.length ? items.map(noticiaItemHTML).join("")
     : "<div style='color:var(--muted);font-size:13px;padding:8px 0;'>No se pudieron cargar novedades del Congreso ahora mismo — probá recargar en un momento.</div>";
 }
-// Se disparan con una pequeña demora para no competir con el resto de las consultas.
-setTimeout(function () { cargarNoticiasSemana().then(cargarCongreso); }, 1500);
+// OJO: las noticias NO se disparan acá. Se lanzan al final, recién DESPUÉS de que
+// terminan de cargar los datos financieros (mercado, granos, pizarra, FOB), para no
+// competir por los proxies CORS y que la pizarra de Rosario y Chicago no queden vacíos.
 
 // ── "Últimas" — titulares en vivo (Google Noticias RSS vía proxy) ─────────────
 const ULTIMAS_QUERIES = [
@@ -1233,7 +1234,7 @@ async function cargarUltimas() {
     return `<div class="news-item"><a class="n-t" href="${n.link}" target="_blank" rel="noreferrer" style="font-size:14px;">${t} ↗</a><div class="n-f">${src}${src && fecha ? " · " : ""}${fecha}</div></div>`;
   }).join("");
 }
-cargarUltimas();
+// (No se llama acá — ver el bloque de arranque al final: las noticias van al último.)
 
 async function cargarRemBcra() {
   const statusEl = document.getElementById("rem-status");
@@ -1416,7 +1417,15 @@ cargarCalendarioEEUU();
 cargarMercado();
 // Granos AR con una pequeña demora: así el petróleo (que usa el mismo puente)
 // termina primero y no lo satura, y la pizarra/FOB entran limpias.
-setTimeout(cargarGranosAR, 2500);
+// Y RECIÉN cuando terminan los granos, lanzamos las noticias (una atrás de otra,
+// sin ráfaga) para que nunca compitan por los proxies con la pizarra ni con Chicago.
+setTimeout(function () {
+  cargarGranosAR()
+    .catch(function () {})
+    .then(cargarUltimas)
+    .then(cargarNoticiasSemana)
+    .then(cargarCongreso);
+}, 2500);
 cargarHistoriaDolar();
 // Render de respaldo: arma el resumen con lo que haya llegado, aunque alguna fuente tarde o falle
 setTimeout(renderResumen, 4500);
