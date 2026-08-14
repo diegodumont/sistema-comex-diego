@@ -583,48 +583,64 @@ async function bajarProxy(px, target) {
   return await r.text();
 }
 
-async function cargarGranosAR() {
-  const nombres = { soja: "Soja", maiz: "Maíz", trigo: "Trigo", girasol: "Girasol" };
-  let pizarra = {}, fecPiz = null, fob = {}, fecFob = null;
+// Intento directo (sin puente): si la fuente permite CORS, es lo más confiable.
+async function bajarDirecto(target) {
+  const r = await fetchTO(target, 6000);
+  if (!r.ok) return null;
+  return await r.text();
+}
 
-  // Para las fuentes oficiales argentinas probamos primero allorigins (que responde
-  // bien para estos sitios) y dejamos codetabs al final (suele estar saturado porque
-  // lo usa el petróleo/Chicago).
-  const PROXIES_AR = [PROXIES[1], PROXIES[2], PROXIES[0], PROXIES[3]].filter(Boolean);
+const NOMBRES_GRANO = { soja: "Soja", maiz: "Maíz", trigo: "Trigo", girasol: "Girasol" };
+const PZ = { precios: {}, fecha: null };
+const FB = { fob: {}, fecha: null };
 
-  // Pizarra Cámara Rosario: probamos cada puente hasta que el parseo traiga datos.
-  // Con dos rondas por si algún puente está caído momentáneamente.
-  for (let intento = 0; intento < 2 && !Object.keys(pizarra).length; intento++) {
-    for (const px of PROXIES_AR) {
+function renderGranosAR() {
+  const items = Object.keys(NOMBRES_GRANO).map((k) => ({ nombre: NOMBRES_GRANO[k], pizarra: PZ.precios[k] != null ? PZ.precios[k] : null, fob: FB.fob[k] != null ? FB.fob[k] : null }));
+  PANEL.granosAR = { fecha: PZ.fecha || FB.fecha || null, fechaFob: FB.fecha, items };
+  if (PANEL.mercado) pintarMercado(PANEL.mercado);
+  renderResumen();
+}
+
+// Pizarra Cámara Rosario: directo → codetabs → allorigins → thingproxy, con reintentos.
+async function fetchPizarra() {
+  const url = "https://www.cac.bcr.com.ar/es/precios-de-pizarra";
+  const intentos = [() => bajarDirecto(url)].concat(PROXIES.map((px) => () => bajarProxy(px, url)));
+  for (let ronda = 0; ronda < 3; ronda++) {
+    for (const intento of intentos) {
       try {
-        const html = await bajarProxy(px, "https://www.cac.bcr.com.ar/es/precios-de-pizarra");
+        const html = await intento();
         if (!html) continue;
         const p = parsePizarra(html);
-        if (Object.keys(p.precios).length) { pizarra = p.precios; fecPiz = p.fecha; break; }
-      } catch (e) { /* siguiente puente */ }
+        if (Object.keys(p.precios).length) { PZ.precios = p.precios; PZ.fecha = p.fecha; renderGranosAR(); return; }
+      } catch (e) { /* siguiente */ }
     }
+    await new Promise((r) => setTimeout(r, 1200)); // esperar a que se libere el puente
   }
+}
 
-  // FOB oficial SAGyP: por cada fecha (hasta 7 días atrás), probamos cada puente.
-  for (let d = 0; d < 7 && !Object.keys(fob).length; d++) {
+// FOB oficial SAGyP: por fecha (hasta 7 días), directo → codetabs → allorigins → thingproxy.
+async function fetchFobSagyp() {
+  const intentos = [(t) => bajarDirecto(t)].concat(PROXIES.map((px) => (t) => bajarProxy(px, t)));
+  for (let d = 0; d < 7 && !Object.keys(FB.fob).length; d++) {
     const dt = new Date(Date.now() - d * 86400000);
     const fq = String(dt.getDate()).padStart(2, "0") + "/" + String(dt.getMonth() + 1).padStart(2, "0") + "/" + dt.getFullYear();
     const target = "https://www.magyp.gob.ar/sitio/areas/ss_mercados_agropecuarios/ws/ssma/precios_fob.php?Fecha=" + fq;
-    for (const px of PROXIES_AR) {
+    for (const intento of intentos) {
       try {
-        const txt = await bajarProxy(px, target);
+        const txt = await intento(target);
         if (!txt) continue;
         let json = null; try { json = JSON.parse(txt); } catch (e) { continue; }
         const posts = json && (Array.isArray(json) ? json : json.posts);
-        if (Array.isArray(posts) && posts.length) { const m = parseFobSagyp(posts); if (Object.keys(m).length) { fob = m; fecFob = fq; break; } }
-      } catch (e) { /* siguiente puente */ }
+        if (Array.isArray(posts) && posts.length) { const m = parseFobSagyp(posts); if (Object.keys(m).length) { FB.fob = m; FB.fecha = fq; renderGranosAR(); return; } }
+      } catch (e) { /* siguiente */ }
     }
   }
+}
 
-  const items = Object.keys(nombres).map((k) => ({ nombre: nombres[k], pizarra: pizarra[k] != null ? pizarra[k] : null, fob: fob[k] != null ? fob[k] : null }));
-  PANEL.granosAR = { fecha: fecPiz || fecFob || null, fechaFob: fecFob, items };
-  if (PANEL.mercado) pintarMercado(PANEL.mercado);
-  renderResumen();
+// Pizarra y FOB en PARALELO (uno no frena al otro); cada uno se dibuja al llegar.
+async function cargarGranosAR() {
+  renderGranosAR(); // muestra la tabla con "—" de entrada (no queda "consultando…" trabado)
+  await Promise.allSettled([fetchPizarra(), fetchFobSagyp()]);
 }
 
 // ── HISTORIA DEL DÓLAR MAYORISTA (para la lectura de estabilidad del resumen) ──
@@ -1355,7 +1371,9 @@ cargarCalendarioEEUU();
 
 // Mercado + historia del dólar para el resumen
 cargarMercado();
-cargarGranosAR();
+// Granos AR con una pequeña demora: así el petróleo (que usa el mismo puente)
+// termina primero y no lo satura, y la pizarra/FOB entran limpias.
+setTimeout(cargarGranosAR, 2500);
 cargarHistoriaDolar();
 // Render de respaldo: arma el resumen con lo que haya llegado, aunque alguna fuente tarde o falle
 setTimeout(renderResumen, 4500);
