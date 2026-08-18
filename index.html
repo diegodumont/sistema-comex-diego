@@ -107,6 +107,22 @@
     <div class="resumen-body" id="resumen-body">
       <p style="color:var(--muted);">Leyendo tipos de cambio, riesgo país, REM, mercado y calendarios para armar la lectura del día…</p>
     </div>
+    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">
+      <button id="btn-linkedin" onclick="generarLinkedIn()"
+        style="background:var(--ink);color:#fff;border:none;cursor:pointer;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:0.03em;padding:10px 16px;border-radius:4px;">
+        ✍ Generar borrador para LinkedIn
+      </button>
+      <span style="font-size:11px;color:var(--muted);margin-left:10px;">Arma un posteo con los datos vivos del panel, conectados. Editalo a tu gusto y publicá.</span>
+      <div id="linkedin-box" style="display:none;margin-top:12px;">
+        <textarea id="linkedin-texto" readonly
+          style="width:100%;box-sizing:border-box;min-height:260px;font-family:inherit;font-size:13px;line-height:1.55;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px;resize:vertical;"></textarea>
+        <button onclick="copiarLinkedIn(this)"
+          style="margin-top:8px;background:var(--acc);color:#fff;border:none;cursor:pointer;font-family:'Space Mono',monospace;font-size:12px;padding:8px 14px;border-radius:4px;">
+          Copiar al portapapeles
+        </button>
+        <span style="font-size:11px;color:var(--muted);margin-left:10px;">Cada click en "Generar" lo rearma con los datos del momento.</span>
+      </div>
+    </div>
   </div>
 
   <div class="section">
@@ -831,6 +847,10 @@ function renderResumen() {
     S("Noticias destacadas", bits.join(" "));
   }
 
+  // ── 8. Conexiones del día (cruces entre bloques) ──
+  const hilos = conexionesDelDia();
+  if (hilos.length) S("Conexiones del día", hilos.map((h) => "◈ " + h).join(" "));
+
   // Cambios a vigilar
   let alertHtml = "";
   if (alertas.length) {
@@ -845,6 +865,147 @@ function renderResumen() {
     const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
     statusEl.textContent = "Actualizado " + ahora + " hs · " + listos.length + " bloques leídos";
   }
+}
+
+// ── CONEXIONES DEL DÍA: el panel cruza sus propios bloques y arma las relaciones ──
+// Cada regla detecta una combinación de datos vivos y la narra como un hilo con
+// lectura propia. Es el insumo del párrafo "Conexiones del día" del resumen y del
+// borrador para LinkedIn.
+function conexionesDelDia() {
+  const c = [];
+  const H = PANEL.dolarHist, R = PANEL.riesgo, B = PANEL.brecha, T = PANEL.tasas;
+
+  // 1. Combo estabilidad: dólar planchado + riesgo bajando
+  if (H && H.estableDesde && R && R.dir < 0 && R.racha >= 2) {
+    const dias = Math.round((Date.parse(H.fecha) - Date.parse(H.estableDesde)) / 864e5);
+    if (dias >= 5) c.push(`El mayorista lleva ~${dias} días sin moverse y el riesgo país acumula ${R.racha} bajas seguidas (${R.valor} pb): la estabilidad cambiaria y la mejora del crédito soberano se están retroalimentando.`);
+  }
+
+  // 2. Carry: brecha contenida + tasa en pesos
+  if (B && B.valor != null && B.valor < 8 && T && T.prom > 25) {
+    c.push(`Con la brecha en ${B.valor.toLocaleString("es-AR", { maximumFractionDigits: 1 })}% y plazos fijos pagando ${T.prom.toLocaleString("es-AR", { maximumFractionDigits: 0 })}% TNA, la tasa en pesos le sigue ganando al dólar quieto: el mercado sigue jugando al carry.`);
+  }
+
+  // 3. Petróleo + costos del comercio
+  if (PANEL.mercado && PANEL.mercado.instrumentos) {
+    const brent = PANEL.mercado.instrumentos.find((i) => i.id === "brent" && i.ok);
+    if (brent && brent.varSemana != null && Math.abs(brent.varSemana) >= 2) {
+      c.push(`El Brent ${brent.varSemana > 0 ? "subió" : "bajó"} ${pctAbs(brent.varSemana)} en la semana (US$ ${brent.precio.toLocaleString("es-AR", { maximumFractionDigits: 1 })}): ${brent.varSemana > 0 ? "presión en fletes y energía que tarde o temprano llega a los costos de importación" : "alivio en fletes y energía que descomprime costos de importación"}.`);
+    }
+    // 4. Chicago empuja (o pisa) al FOB local
+    const sojaChi = PANEL.mercado.instrumentos.find((i) => i.id === "soja" && i.ok);
+    const sojaAR = PANEL.granosAR && PANEL.granosAR.items && PANEL.granosAR.items.find((x) => x.nombre === "Soja");
+    if (sojaChi && sojaChi.varSemana != null && Math.abs(sojaChi.varSemana) >= 2 && sojaAR && sojaAR.fob != null) {
+      c.push(`La soja en Chicago ${sojaChi.varSemana > 0 ? "subió" : "cayó"} ${pctAbs(sojaChi.varSemana)} en la semana y el FOB oficial local está en US$ ${sojaAR.fob}/t: si Chicago sostiene el movimiento, el precio de exportación argentino lo va a seguir.`);
+    }
+  }
+
+  // 5. Agenda INDEC + expectativa REM (el dato que viene vs. lo que espera el mercado)
+  if (PANEL.indec && PANEL.indec.length && PANEL.rem && PANEL.rem.filas) {
+    const ica = PANEL.indec.find((e) => e.indicadores.some((i) => /intercambio comercial/i.test(i)));
+    const saldo = PANEL.rem.filas.find((x) => x.indicador.toLowerCase().includes("saldo comercial"));
+    if (ica && saldo && saldo.proyeccion) {
+      c.push(`El ${ica.fecha.slice(0, 5)} el INDEC publica el intercambio comercial (ICA), y el REM espera ${saldo.proyeccion.charAt(0).toLowerCase() + saldo.proyeccion.slice(1)}: el dato va a confirmar o desafiar esa expectativa.`);
+    }
+    const ipc = PANEL.indec.find((e) => e.indicadores.some((i) => /índice de precios al consumidor|ipc/i.test(i)));
+    const infRem = PANEL.rem.filas.find((x) => x.indicador.toLowerCase().includes("inflación (ipc nivel"));
+    if (ipc && infRem && infRem.dato && typeof IPCBA !== "undefined") {
+      c.push(`Antes del IPC nacional del ${ipc.fecha.slice(0, 5)}, ya hay dos pistas: la inflación porteña dio ${IPCBA.mensual} y el REM espera ${infRem.dato}.`);
+    }
+  }
+
+  // 6. Normativa + noticias (la letra chica confirma el clima)
+  if (PANEL.normativa && PANEL.normativa.total >= 2 && PANEL.noticias && PANEL.noticias.argentina && PANEL.noticias.argentina.length) {
+    c.push(`Día cargado en lo normativo (${PANEL.normativa.total} referencias comex en el Boletín Oficial) en paralelo con la agenda: la política comercial se mueve por los dos canales a la vez.`);
+  }
+
+  return c.slice(0, 4);
+}
+
+// ── BORRADOR PARA LINKEDIN: un posteo listo para editar y publicar ────────────
+// Regla de oro respetada: cada número sale de una fuente viva del panel.
+function generarLinkedIn() {
+  const box = document.getElementById("linkedin-box");
+  const ta = document.getElementById("linkedin-texto");
+  if (!box || !ta) return;
+
+  const hoy = new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  const L = [];
+  const may = getDolar("mayorista");
+  const H = PANEL.dolarHist, R = PANEL.riesgo, B = PANEL.brecha;
+
+  // Gancho: el hecho más fuerte del día
+  let gancho = null;
+  if (H && H.estableDesde && H.fecha && (Date.parse(H.fecha) - Date.parse(H.estableDesde)) / 864e5 >= 7) {
+    const dias = Math.round((Date.parse(H.fecha) - Date.parse(H.estableDesde)) / 864e5);
+    gancho = `${dias} días. Eso lleva el dólar mayorista prácticamente sin moverse.`;
+  } else if (R && R.racha >= 3 && R.dir < 0) {
+    gancho = `${R.racha} jornadas seguidas de baja del riesgo país. Hoy: ${R.valor} pb.`;
+  } else if (may) {
+    gancho = `Foto del día en el mercado cambiario: mayorista en ${money(may.venta)}.`;
+  } else {
+    gancho = `Lectura del día — economía y comercio exterior.`;
+  }
+  L.push(gancho);
+  L.push("");
+
+  // Datos duros, cortitos
+  const datos = [];
+  if (may) datos.push(`▸ Dólar mayorista: ${money(may.venta)}${H && H.varSem != null ? ` (${pctSigned(H.varSem)} en la semana)` : ""}`);
+  if (B && B.valor != null) datos.push(`▸ Brecha con el CCL: ${B.valor.toLocaleString("es-AR", { maximumFractionDigits: 1 })}%`);
+  if (R) datos.push(`▸ Riesgo país: ${R.valor} pb${R.semAnt != null ? ` (hace una semana: ${R.semAnt})` : ""}`);
+  if (PANEL.mercado && PANEL.mercado.instrumentos) {
+    const brent = PANEL.mercado.instrumentos.find((i) => i.id === "brent" && i.ok);
+    if (brent) datos.push(`▸ Brent: US$ ${brent.precio.toLocaleString("es-AR", { maximumFractionDigits: 1 })}${brent.varSemana != null ? ` (${pctSigned(brent.varSemana)} semanal)` : ""}`);
+  }
+  if (PANEL.granosAR && PANEL.granosAR.items) {
+    const soja = PANEL.granosAR.items.find((x) => x.nombre === "Soja");
+    if (soja && soja.fob != null) datos.push(`▸ Soja FOB oficial: US$ ${soja.fob}/t${soja.pizarra != null ? ` · pizarra Rosario $${soja.pizarra.toLocaleString("es-AR")}/t` : ""}`);
+  }
+  L.push(...datos.slice(0, 5));
+
+  // La conexión (el valor agregado de Diego)
+  const conex = conexionesDelDia();
+  if (conex.length) {
+    L.push("");
+    L.push("La lectura que me importa:");
+    L.push(conex[0]);
+    if (conex[1]) L.push(conex[1]);
+  }
+
+  // Qué mirar (agenda)
+  const agenda = [];
+  if (PANEL.indec && PANEL.indec.length) {
+    const e = PANEL.indec[0];
+    agenda.push(`el ${e.fecha.slice(0, 5)} el INDEC publica ${(e.indicadores[0] || "").replace(/\.\s*$/, "")}`);
+  }
+  if (PANEL.eeuu && PANEL.eeuu.length) {
+    const fut = PANEL.eeuu.filter((e) => e.fecha && Date.parse(e.fecha) >= Date.now()).sort((a, b) => Date.parse(a.fecha) - Date.parse(b.fecha));
+    if (fut.length) agenda.push(`en EEUU viene ${fut[0].nombre}`);
+  }
+  if (agenda.length) {
+    L.push("");
+    L.push(`📌 Lo que sigue: ${agenda.join("; ")}.`);
+  }
+
+  L.push("");
+  L.push(`(Datos al ${hoy}, de fuentes oficiales y de mercado: BCRA, INDEC, DolarAPI, Cámara Arbitral de Rosario, SAGyP, Yahoo Finance.)`);
+  L.push("");
+  L.push("#ComercioExterior #Economía #Argentina #Aduana #Dólar #Comex");
+
+  ta.value = L.join("\n");
+  box.style.display = "block";
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight + 8, 520) + "px";
+}
+
+function copiarLinkedIn(btn) {
+  const ta = document.getElementById("linkedin-texto");
+  if (!ta) return;
+  const listo = () => { const t = btn.textContent; btn.textContent = "✓ Copiado"; setTimeout(() => { btn.textContent = t; }, 1800); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(listo).catch(() => { ta.select(); document.execCommand("copy"); listo(); });
+  } else { ta.select(); document.execCommand("copy"); listo(); }
 }
 
 function fmtFecha(iso) {
