@@ -436,6 +436,8 @@ const PROXIES = [
   // 1º: puente PROPIO del panel (función serverless de este mismo sitio, netlify/functions/puente.js).
   // Sin CORS, sin depender de servicios gratuitos de terceros que se caen. Camino principal.
   { url: (u) => "/.netlify/functions/puente?url=" + encodeURIComponent(u), envuelto: false },
+  // Por si el archivo quedó guardado como "Puente.js" (con mayúscula), probamos ese nombre también.
+  { url: (u) => "/.netlify/functions/Puente?url=" + encodeURIComponent(u), envuelto: false },
   // Respaldo: puentes públicos, por si el propio no respondiera.
   { url: (u) => "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u), envuelto: false },
   { url: (u) => "https://api.allorigins.win/get?url=" + encodeURIComponent(u), envuelto: true },
