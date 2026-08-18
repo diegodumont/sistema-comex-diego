@@ -204,7 +204,7 @@ document.getElementById("fecha-hoy").textContent = "Actualizado — " + new Date
 // ═════════════════════════════════════════════════════════════════════════════
 // ESTADO COMPARTIDO DEL PANEL + HELPERS (para el recuadro RESUMEN y para MERCADO)
 // ═════════════════════════════════════════════════════════════════════════════
-const PANEL = { dolares: null, dolarHist: null, riesgo: null, rem: null, mercado: null, eeuu: null, granosAR: null };
+const PANEL = { dolares: null, dolarHist: null, riesgo: null, rem: null, mercado: null, eeuu: null, granosAR: null, brecha: null, tasas: null, normativa: null, indec: null, noticias: null };
 
 function pct(a, b) { return (b == null || b === 0 || a == null) ? null : Math.round(((a - b) / b) * 1000) / 10; }
 function pctAbs(v) { return v == null ? "—" : Math.abs(v).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "%"; }
@@ -671,96 +671,165 @@ async function cargarHistoriaDolar() {
     const hace = (d) => { const o = tMs - d * 86400000; let e = null; for (const p of serie) { if (Date.parse(p.fecha + "T00:00:00Z") <= o) e = p; } return e || serie[0]; };
     const sem = hace(7), mes = hace(30);
     PANEL.dolarHist = { venta: last.venta, fecha: last.fecha, semAnt: sem.venta, mesAnt: mes.venta, varSem: pct(last.venta, sem.venta), varMes: pct(last.venta, mes.venta) };
+    // ¿Desde cuándo está "planchado" el mayorista? (todos los valores a ±0,5% del último)
+    let estableDesde = null;
+    for (let i = serie.length - 1; i >= 0; i--) {
+      const v = pct(serie[i].venta, last.venta);
+      if (v != null && Math.abs(v) <= 0.5) estableDesde = serie[i].fecha; else break;
+    }
+    PANEL.dolarHist.estableDesde = estableDesde;
   } catch (e) { /* la lectura de estabilidad es opcional */ }
   renderResumen();
 }
 
-// ── RESUMEN: lectura automática del día ───────────────────────────────────────
+// ── RESUMEN: lectura del día, narrada como un informe de coyuntura ────────────
+// Lee TODOS los bloques del panel (cambiario, riesgo, tasas, REM, precios,
+// agenda INDEC/EEUU/Congreso, mercados, granos, normativa comex y noticias)
+// y arma una situación económica argentina y global en prosa. Cada dato citado
+// acá tiene su fuente en la sección correspondiente del panel.
 function renderResumen() {
   const body = document.getElementById("resumen-body");
   const statusEl = document.getElementById("resumen-status");
   if (!body) return;
   const partes = [];
   const alertas = [];
+  const S = (t, txt) => partes.push(`<p class="rp-frase"><b>${t}.</b> ${txt}</p>`);
+  const fCorta = (iso) => { if (!iso) return null; const [a, m, d] = iso.split("-"); return d + "/" + m; };
 
-  // 1) Tipos de cambio
+  // ── 1. Panorama cambiario ──
   const may = getDolar("mayorista"), ofi = getDolar("oficial"), tar = getDolar("tarjeta"), mep = getDolar("bolsa"), ccl = getDolar("contadoconliqui");
   if (may) {
-    let f = `El <b>dólar mayorista</b> opera en ${money(may.venta)}`;
-    const extra = [];
-    if (ofi) extra.push(`oficial minorista ${money(ofi.venta)}`);
-    if (tar) extra.push(`tarjeta ${money(tar.venta)}`);
-    if (extra.length) f += ` (${extra.join(", ")})`;
-    const fin = [];
-    if (mep) fin.push(`MEP ${money(mep.venta)}`);
-    if (ccl) fin.push(`CCL ${money(ccl.venta)}`);
-    if (fin.length) f += `. En los financieros, ${fin.join(" y ")}`;
-    f += ".";
-    if (PANEL.dolarHist && PANEL.dolarHist.varSem != null) {
-      const v = PANEL.dolarHist.varSem;
-      f += ` En la última semana el mayorista ${palabraMov(v)} ${pctAbs(v)}`;
-      if (PANEL.dolarHist.varMes != null) f += ` y en el mes ${pctSigned(PANEL.dolarHist.varMes)}`;
-      f += ".";
-      if (Math.abs(v) < 1) f += " Se observa <b>estabilidad cambiaria</b>.";
-      if (Math.abs(v) >= 2) alertas.push(`Dólar mayorista: ${palabraMov(v)} ${pctAbs(v)} en la semana.`);
+    let f = `El <b>dólar mayorista</b> opera en <b>${money(may.venta)}</b>`;
+    const H = PANEL.dolarHist;
+    if (H && H.estableDesde && H.fecha && (Date.parse(H.fecha) - Date.parse(H.estableDesde)) / 864e5 >= 5) {
+      f += `, prácticamente en el mismo lugar desde el <b>${fCorta(H.estableDesde)}</b> (se movió menos de ±0,5% en todo ese período)`;
+    } else if (H && H.varSem != null) {
+      f += `; en la última semana ${palabraMov(H.varSem)} ${pctAbs(H.varSem)}` + (H.varMes != null ? ` y en el mes acumula ${pctSigned(H.varMes)}` : "");
     }
-    partes.push(`<p class="rp-frase">${f}</p>`);
-  }
-
-  // 2) Riesgo país
-  if (PANEL.riesgo) {
-    const r = PANEL.riesgo;
-    let racha = "";
-    if (r.racha >= 2 && r.dir !== 0) racha = `, y viene ${r.dir < 0 ? "bajando" : "subiendo"} hace ${r.racha} jornadas`;
-    let f = `El <b>riesgo país</b> está en <b>${r.valor} pb</b>${racha}.`;
-    if (r.semAnt != null) f += ` Hace una semana estaba en ${r.semAnt} pb`;
-    if (r.mesAnt != null) f += ` y hace un mes en ${r.mesAnt} pb`;
     f += ".";
-    partes.push(`<p>${f}</p>`);
-    if (r.racha >= 3 && r.dir !== 0) alertas.push(`Riesgo país: ${r.racha} jornadas seguidas en ${r.dir < 0 ? "baja" : "suba"} (hoy ${r.valor} pb).`);
-    else if (r.varSem != null && Math.abs(r.varSem) >= 8) alertas.push(`Riesgo país: ${r.varSem > 0 ? "subió" : "bajó"} ${pctAbs(r.varSem)} en la semana (hoy ${r.valor} pb).`);
+    const otros = [];
+    if (ofi) otros.push(`minorista ${money(ofi.venta)}`);
+    if (tar) otros.push(`tarjeta ${money(tar.venta)}`);
+    if (mep) otros.push(`MEP ${money(mep.venta)}`);
+    if (ccl) otros.push(`CCL ${money(ccl.venta)}`);
+    if (otros.length) f += ` El resto del mapa cambiario: ${otros.join(", ")}.`;
+    if (PANEL.brecha && PANEL.brecha.valor != null) {
+      const b = PANEL.brecha;
+      f += ` La <b>brecha</b> mayorista–CCL es de ${b.valor.toLocaleString("es-AR", { maximumFractionDigits: 1 })}%` +
+        (b.dif ? ` (${b.dif > 0 ? "se amplió" : "se achicó"} ${Math.abs(b.dif).toLocaleString("es-AR", { maximumFractionDigits: 1 })} pp desde la última consulta)` : "") +
+        (b.valor < 5 ? ", un nivel contenido que no marca tensión cambiaria." : b.valor > 15 ? ", un nivel que ya expresa presión sobre el tipo de cambio." : ".");
+    }
+    S("Panorama cambiario", f);
+    if (H && H.varSem != null && Math.abs(H.varSem) >= 2) alertas.push(`Dólar mayorista: ${palabraMov(H.varSem)} ${pctAbs(H.varSem)} en la semana.`);
   }
 
-  // 3) REM del BCRA
-  if (PANEL.rem && PANEL.rem.filas) {
-    const fila = (n) => PANEL.rem.filas.find((x) => x.indicador.toLowerCase().includes(n));
-    const inf = fila("inflación (ipc nivel"), tc = fila("tipo de cambio"), saldo = fila("saldo comercial");
+  // ── 2. Deuda, tasas y expectativas ──
+  {
     const bits = [];
-    if (inf && inf.dato) bits.push(`inflación ${inf.dato}`);
-    if (tc && tc.proyeccion) bits.push(/^diciembre/i.test(tc.proyeccion) ? "tipo de cambio a fin de año " + tc.proyeccion.replace(/^Diciembre:\s*/i, "") : "tipo de cambio " + tc.proyeccion);
-    if (saldo && saldo.proyeccion) bits.push(`balanza comercial ${saldo.proyeccion.charAt(0).toLowerCase() + saldo.proyeccion.slice(1)}`);
-    let f = `El último <b>REM del BCRA</b> (${PANEL.rem.mesRem}) proyecta`;
-    f += bits.length ? `: ${bits.join("; ")}.` : " sus principales variables (ver el detalle en la sección REM).";
-    partes.push(`<p>${f}</p>`);
+    if (PANEL.riesgo) {
+      const r = PANEL.riesgo;
+      let t = `El <b>riesgo país</b> se ubica en <b>${r.valor} pb</b>`;
+      if (r.racha >= 2 && r.dir !== 0) t += `, con ${r.racha} jornadas seguidas ${r.dir < 0 ? "a la baja" : "al alza"}`;
+      if (r.semAnt != null) t += ` (hace una semana: ${r.semAnt} pb${r.mesAnt != null ? `; hace un mes: ${r.mesAnt} pb` : ""})`;
+      bits.push(t + ".");
+      if (r.racha >= 3 && r.dir !== 0) alertas.push(`Riesgo país: ${r.racha} jornadas seguidas en ${r.dir < 0 ? "baja" : "suba"} (hoy ${r.valor} pb).`);
+      else if (r.varSem != null && Math.abs(r.varSem) >= 8) alertas.push(`Riesgo país: ${r.varSem > 0 ? "subió" : "bajó"} ${pctAbs(r.varSem)} en la semana (hoy ${r.valor} pb).`);
+    }
+    if (PANEL.tasas && PANEL.tasas.prom) {
+      bits.push(`El <b>plazo fijo</b> promedia una TNA de ${PANEL.tasas.prom.toLocaleString("es-AR", { maximumFractionDigits: 1 })}%${PANEL.tasas.mejorNombre ? ` (la mejor: ${PANEL.tasas.mejorNombre}, ${PANEL.tasas.mejorTna.toLocaleString("es-AR", { maximumFractionDigits: 1 })}%)` : ""}.`);
+    }
+    if (PANEL.rem && PANEL.rem.filas) {
+      const fila = (n) => PANEL.rem.filas.find((x) => x.indicador.toLowerCase().includes(n));
+      const inf = fila("inflación (ipc nivel"), tc = fila("tipo de cambio"), saldo = fila("saldo comercial");
+      const rb = [];
+      if (inf && inf.dato) rb.push(`inflación ${inf.dato}`);
+      if (tc && tc.proyeccion) rb.push(/^diciembre/i.test(tc.proyeccion) ? "dólar a fin de año " + tc.proyeccion.replace(/^Diciembre:\s*/i, "") : "dólar " + tc.proyeccion);
+      if (saldo && saldo.proyeccion) rb.push(`balanza comercial ${saldo.proyeccion.charAt(0).toLowerCase() + saldo.proyeccion.slice(1)}`);
+      if (rb.length) bits.push(`Las <b>expectativas del mercado</b> (REM del BCRA, ${PANEL.rem.mesRem}): ${rb.join("; ")}.`);
+    }
+    if (bits.length) S("Deuda, tasas y expectativas", bits.join(" "));
   }
 
-  // 4) Mercado
+  // ── 3. Precios y consumo ──
+  if (typeof IPCBA !== "undefined" || typeof CAME !== "undefined") {
+    const bits = [];
+    if (typeof IPCBA !== "undefined") bits.push(`La <b>inflación porteña</b> (IPCBA, ${IPCBA.mes.toLowerCase()}) fue ${IPCBA.mensual} mensual —suele anticipar el IPC nacional—, con ${IPCBA.interanual} interanual; el próximo dato llega en los ${IPCBA.proxima.replace("primeros días de ", "primeros días de ")}.`);
+    if (typeof CAME !== "undefined") bits.push(`Del lado del <b>consumo</b>, las ventas minoristas pyme (CAME, ${CAME.mes.toLowerCase()}) marcaron ${CAME.mensual} mensual y ${CAME.interanual} interanual.`);
+    if (bits.length) S("Precios y consumo", bits.join(" "));
+  }
+
+  // ── 4. Agenda de la semana ──
+  {
+    const bits = [];
+    if (PANEL.indec && PANEL.indec.length) {
+      const dias = PANEL.indec.slice(0, 3).map((e) => {
+        const ind = e.indicadores[0] || "";
+        const extra = e.indicadores.length > 1 ? ` y ${e.indicadores.length - 1} más` : "";
+        return `el <b>${e.fecha.slice(0, 5)}</b>, ${ind}${extra}`;
+      });
+      bits.push(`El <b>INDEC</b> publica esta semana (siempre 16 hs): ${dias.join("; ")}.`);
+    }
+    if (PANEL.eeuu && PANEL.eeuu.length) {
+      const ahora = Date.now();
+      const fut = PANEL.eeuu.filter((e) => e.fecha && Date.parse(e.fecha) >= ahora).sort((a, b) => Date.parse(a.fecha) - Date.parse(b.fecha));
+      if (fut.length) {
+        const n = fut[0];
+        const fstr = new Date(n.fecha).toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+        bits.push(`En <b>EEUU</b>, el próximo dato que mueve al mercado es <b>${n.nombre}</b> (${fstr}).`);
+      }
+    }
+    if (PANEL.noticias && PANEL.noticias.congreso && PANEL.noticias.congreso.length) {
+      bits.push(`En el <b>Congreso</b>, lo que suena: “${PANEL.noticias.congreso[0]}”${PANEL.noticias.congreso[1] ? ` y “${PANEL.noticias.congreso[1]}”` : ""}.`);
+    }
+    if (bits.length) S("Agenda de la semana", bits.join(" "));
+  }
+
+  // ── 5. Mercados internacionales y granos ──
   if (PANEL.mercado && PANEL.mercado.instrumentos) {
     const insts = PANEL.mercado.instrumentos.filter((i) => i.ok && i.varSemana != null);
-    const movers = insts.slice().sort((a, b) => Math.abs(b.varSemana) - Math.abs(a.varSemana)).slice(0, 2);
-    if (movers.length) {
-      const txt = movers.map((m) => `${limpiarNombre(m.nombre)} ${palabraMov(m.varSemana)} ${pctAbs(m.varSemana)}`).join(", y ");
-      partes.push(`<p>En el <b>mercado</b>, lo más destacado de la semana: ${txt}.</p>`);
+    const bits = [];
+    const brent = insts.find((i) => i.id === "brent");
+    if (brent) bits.push(`El <b>Brent</b> cotiza en US$ ${brent.precio.toLocaleString("es-AR", { maximumFractionDigits: 1 })} el barril (${palabraMov(brent.varSemana)} ${pctAbs(brent.varSemana)} en la semana).`);
+    const oro = insts.find((i) => i.id === "oro");
+    if (oro) bits.push(`El <b>oro</b>, en US$ ${Math.round(oro.precio).toLocaleString("es-AR")} la onza (${pctSigned(oro.varSemana)} semanal).`);
+    const movers = insts.filter((i) => i.id !== "brent" && i.id !== "oro").sort((a, b) => Math.abs(b.varSemana) - Math.abs(a.varSemana)).slice(0, 1);
+    if (movers.length && Math.abs(movers[0].varSemana) >= 1) bits.push(`Lo más movido: ${limpiarNombre(movers[0].nombre)} ${palabraMov(movers[0].varSemana)} ${pctAbs(movers[0].varSemana)}.`);
+    if (PANEL.granosAR && PANEL.granosAR.items) {
+      const soja = PANEL.granosAR.items.find((x) => x.nombre === "Soja");
+      if (soja && (soja.pizarra != null || soja.fob != null)) {
+        const g = [];
+        if (soja.pizarra != null) g.push(`pizarra Rosario $${soja.pizarra.toLocaleString("es-AR")}/t`);
+        if (soja.fob != null) g.push(`FOB oficial US$ ${soja.fob}/t`);
+        bits.push(`En <b>granos</b>, la soja: ${g.join(" y ")}${PANEL.granosAR.fecha ? ` (al ${PANEL.granosAR.fecha})` : ""}.`);
+      }
     }
     insts.forEach((m) => {
       if (Math.abs(m.varSemana) >= 5) alertas.push(`${limpiarNombre(m.nombre)}: ${palabraMov(m.varSemana)} ${pctAbs(m.varSemana)} en la semana.`);
       else if (m.varMes != null && Math.abs(m.varMes) >= 12) alertas.push(`${limpiarNombre(m.nombre)}: ${pctSigned(m.varMes)} en el último mes.`);
     });
+    if (bits.length) S("Mercados y granos", bits.join(" "));
   }
 
-  // 5) EEUU — próximo dato relevante
-  if (PANEL.eeuu && PANEL.eeuu.length) {
-    const ahora = Date.now();
-    const futuros = PANEL.eeuu.filter((e) => e.fecha && Date.parse(e.fecha) >= ahora).sort((a, b) => Date.parse(a.fecha) - Date.parse(b.fecha));
-    if (futuros.length) {
-      const n = futuros[0];
-      const fstr = new Date(n.fecha).toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-      partes.push(`<p>En <b>EEUU</b>, el próximo dato relevante es <b>${n.nombre}</b> (${fstr}).</p>`);
+  // ── 6. Comex: normativa del día ──
+  if (PANEL.normativa) {
+    const n = PANEL.normativa;
+    if (n.total > 0) {
+      S("Normativa comex", `El Boletín Oficial de hoy (${n.fecha}) trae <b>${n.total} referencia${n.total > 1 ? "s" : ""}</b> de comercio exterior. ${n.items[0] ? `La más relevante: “${n.items[0].length > 110 ? n.items[0].slice(0, 110) + "…" : n.items[0]}”.` : ""} El detalle, con enlaces, está en la sección Normativa.`);
+      if (n.total >= 3) alertas.push(`Normativa comex: ${n.total} referencias hoy en el Boletín Oficial — día cargado.`);
+    } else {
+      S("Normativa comex", `El Boletín Oficial de hoy (${n.fecha}) no trae referencias de comercio exterior según las palabras clave del panel: jornada tranquila en lo normativo.`);
     }
   }
 
-  // 6) INDEC
-  partes.push(`<p>El <b>INDEC</b> difunde sus indicadores a las 16 hs. <a class="fuente" href="https://www.indec.gob.ar/indec/web/Calendario-Fecha-0" target="_blank" rel="noreferrer">Ver qué se publica este mes ↗</a></p>`);
+  // ── 7. Noticias destacadas ──
+  if (PANEL.noticias && (PANEL.noticias.argentina || PANEL.noticias.mundo)) {
+    const bits = [];
+    const ar = PANEL.noticias.argentina || [], mu = PANEL.noticias.mundo || [];
+    if (ar.length) bits.push(`En la agenda local: “${ar[0]}”${ar[1] ? `; también, “${ar[1]}”` : ""}.`);
+    if (mu.length) bits.push(`En el plano internacional: “${mu[0]}”${mu[1] ? `, junto con “${mu[1]}”` : ""}.`);
+    bits.push(`Los titulares completos, con fuente y enlace, están más abajo.`);
+    S("Noticias destacadas", bits.join(" "));
+  }
 
   // Cambios a vigilar
   let alertHtml = "";
@@ -772,7 +841,7 @@ function renderResumen() {
   body.innerHTML = (partes.length ? partes.join("") : `<p style="color:var(--muted);">Leyendo los datos del panel…</p>`) + alertHtml;
 
   if (statusEl) {
-    const listos = [PANEL.dolares && "dólar", PANEL.riesgo && "riesgo país", PANEL.rem && "REM", PANEL.mercado && "mercado"].filter(Boolean);
+    const listos = [PANEL.dolares && "dólar", PANEL.riesgo && "riesgo país", PANEL.rem && "REM", PANEL.mercado && "mercado", PANEL.indec && "INDEC", PANEL.normativa && "normativa", PANEL.noticias && "noticias", PANEL.tasas && "tasas"].filter(Boolean);
     const ahora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
     statusEl.textContent = "Actualizado " + ahora + " hs · " + listos.length + " bloques leídos";
   }
@@ -932,6 +1001,8 @@ async function cargarTasas() {
     const mejorTna = mejor.tnaClientes * 100;
     const anuales = data.map((b) => { const t = (b.tasas || []).find((x) => x.plazoMinDias <= 365 && x.plazoMaxDias >= 365); return t && t.tna > 0 ? t.tna : null; }).filter((x) => x != null);
     const promAnual = anuales.length ? anuales.reduce((a, b) => a + b, 0) / anuales.length * 100 : null;
+    PANEL.tasas = { prom, mejorNombre: mejor.entidad || "", mejorTna };
+    renderResumen();
     const fmt = (n) => n.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
 
     // Tendencia del promedio respecto de la última vez
@@ -993,6 +1064,8 @@ async function cargarNormativaComex() {
 
     statusEl.textContent = "● Consultado en vivo desde el Boletín Oficial — " + data.fecha;
     statusEl.className = "live-status live-ok";
+    PANEL.normativa = { fecha: data.fecha, total: data.resultados.length, items: data.resultados.map((r) => r.titulo).slice(0, 3) };
+    renderResumen();
 
     if (!data.resultados.length) {
       cont.innerHTML = `<div class="card">Hoy no se detectaron referencias de comercio exterior en el Boletín Oficial (según las palabras clave configuradas). <a class="fuente" href="${data.fuente}" target="_blank" rel="noreferrer">Ver Boletín Oficial ↗</a></div>`;
@@ -1022,25 +1095,52 @@ cargarNormativaComex();
 // y solo su sitio web las refleja) y además su tabla en columnas se parsea de forma
 // inestable. Para no arriesgar mostrar una fecha equivocada a clientes o medios, este
 // bloque enlaza siempre a la fuente oficial, que es la única que está al día.
-function cargarCalendarioIndec() {
+async function cargarCalendarioIndec() {
   const statusEl = document.getElementById("indec-status");
   const cont = document.getElementById("indec-calendario");
   const urlIndec = "https://www.indec.gob.ar/indec/web/Calendario-Fecha-0";
-  statusEl.textContent = "● Fuente oficial en vivo — el INDEC actualiza el calendario en su sitio";
-  statusEl.className = "live-status live-ok";
-  cont.innerHTML = `
-    <div style="padding:18px 4px;">
-      <div style="font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:16px;">
-        El calendario de difusión del INDEC se ajusta durante el mes, y solo el sitio oficial refleja siempre la fecha vigente de cada publicación (todas se difunden a las <b>16:00&nbsp;hs</b>). Para no mostrar una fecha desactualizada, este panel te lleva directo a la fuente oficial en vivo, donde ves qué se publica en el mes.
-      </div>
+  const boton = `
       <a href="${urlIndec}" target="_blank" rel="noreferrer"
-         style="display:inline-block;background:var(--ink);color:#fff;font-family:'Space Mono',monospace;font-size:13px;letter-spacing:0.03em;text-decoration:none;padding:12px 20px;border-radius:4px;">
+         style="display:inline-block;background:var(--ink);color:#fff;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:0.03em;text-decoration:none;padding:10px 16px;border-radius:4px;margin-top:12px;">
         Ver calendario oficial del INDEC (en vivo) ↗
-      </a>
-      <div style="font-size:11px;color:var(--muted);margin-top:14px;font-family:'Space Mono',monospace;">
-        Fuente: indec.gob.ar · Calendario de difusión
-      </div>
-    </div>`;
+      </a>`;
+  try {
+    const res = await fetch("/.netlify/functions/calendario-indec?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (data.error || !data.eventos || !data.eventos.length) throw new Error(data.mensaje || "sin eventos en la ventana");
+
+    PANEL.indec = data.eventos; // [{fecha:"dd/mm/aaaa", indicadores:[...]}]
+    renderResumen();
+
+    const dias = data.eventos.map((e) => {
+      const [dd, mm, aa] = e.fecha.split("/");
+      const dSem = new Date(+aa, +mm - 1, +dd).toLocaleDateString("es-AR", { weekday: "long" });
+      const lis = e.indicadores.map((i) => `<li>${i}</li>`).join("");
+      return `<div style="margin:10px 0;"><div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--acc);">${dSem} ${e.fecha} · 16:00 hs</div><ul style="margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--ink-soft);">${lis}</ul></div>`;
+    }).join("");
+
+    statusEl.textContent = "● Publicaciones del INDEC en los próximos 7 días — según su calendario de difusión oficial";
+    statusEl.className = "live-status live-ok";
+    cont.innerHTML = `
+      <div style="padding:14px 4px;">
+        ${dias}
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;">El INDEC puede ajustar fechas durante el mes: ante cualquier duda, la página oficial es la palabra final. Todas las publicaciones salen a las <b>16:00&nbsp;hs</b>.</div>
+        ${boton}
+        <div style="font-size:11px;color:var(--muted);margin-top:12px;font-family:'Space Mono',monospace;">Fuente: indec.gob.ar · Calendario de difusión</div>
+      </div>`;
+  } catch (e) {
+    statusEl.textContent = "● Fuente oficial en vivo — el INDEC actualiza el calendario en su sitio";
+    statusEl.className = "live-status live-ok";
+    cont.innerHTML = `
+      <div style="padding:18px 4px;">
+        <div style="font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:4px;">
+          No se pudo leer el calendario automáticamente ahora mismo (${e.message || e}). El sitio oficial refleja siempre la fecha vigente de cada publicación (todas a las <b>16:00&nbsp;hs</b>).
+        </div>
+        ${boton}
+        <div style="font-size:11px;color:var(--muted);margin-top:12px;font-family:'Space Mono',monospace;">Fuente: indec.gob.ar · Calendario de difusión</div>
+      </div>`;
+  }
 }
 cargarCalendarioIndec();
 
@@ -1174,14 +1274,18 @@ async function cargarNoticiasSemana() {
   const cont = document.getElementById("noticias-semana");
   if (!cont) return;
   let html = "", hubo = false;
-  for (const grp of NOTICIAS_GRUPOS) {
+  PANEL.noticias = PANEL.noticias || {};
+  for (let gi = 0; gi < NOTICIAS_GRUPOS.length; gi++) {
+    const grp = NOTICIAS_GRUPOS[gi];
     let items = [];
     try { items = await traerNoticias(grp.q, { dias: 14, max: 6 }); } catch (e) {}
     if (items.length) {
       hubo = true;
       html += `<div class="news-grupo">${grp.grupo}</div>` + items.map(noticiaItemHTML).join("");
+      PANEL.noticias[gi === 0 ? "argentina" : "mundo"] = items.map((n) => limpiarTitulo(n.title));
     }
   }
+  renderResumen();
   cont.innerHTML = hubo ? html
     : "<div style='color:var(--muted);font-size:13px;padding:8px 0;'>No se pudieron cargar las noticias en vivo ahora mismo — probá recargar en un momento.</div>";
 }
@@ -1191,6 +1295,7 @@ async function cargarCongreso() {
   if (!cont) return;
   let items = [];
   try { items = await traerNoticias(CONGRESO_QUERY, { dias: 21, max: 6 }); } catch (e) {}
+  if (items.length) { PANEL.noticias = PANEL.noticias || {}; PANEL.noticias.congreso = items.map((n) => limpiarTitulo(n.title)); renderResumen(); }
   cont.innerHTML = items.length ? items.map(noticiaItemHTML).join("")
     : "<div style='color:var(--muted);font-size:13px;padding:8px 0;'>No se pudieron cargar novedades del Congreso ahora mismo — probá recargar en un momento.</div>";
 }
